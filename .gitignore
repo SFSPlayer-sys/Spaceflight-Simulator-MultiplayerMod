@@ -1,0 +1,8 @@
+.vscode
+.DS_Store
+.editorconfig
+Mod/bin
+Mod/obj
+Server/bin
+Server/obj
+Release/

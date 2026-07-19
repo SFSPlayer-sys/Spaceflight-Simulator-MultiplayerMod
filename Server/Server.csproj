@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFrameworks>net4.8;net6.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net4.8'">
+    <LangVersion>8.0</LangVersion>
+    <ImplicitUsings>disable</ImplicitUsings>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net6.0'">
+    <LangVersion>10.0</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net4.8'">
+    <Compile Include="../Common/*.cs" />
+    <Compile Remove="UnityTypes.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Lidgren.Network" Version="1.0.2" />
+    <PackageReference Include="ScottPlot" Version="5.0.55" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net4.8'">
+    <Reference Include="C:\Program Files (x86)\Steam\steamapps\common\Spaceflight Simulator\Spaceflight Simulator Game\Spaceflight Simulator_Data\Managed\*">
+      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Spaceflight Simulator\Spaceflight Simulator Game\Spaceflight Simulator_Data\Managed\*.dll</HintPath>
+    </Reference>
+    <Reference Include="UITools">
+      <HintPath>C:\Users\Administrator\Downloads\SFSs\1.5.10.2_Release\Mods\UITools\UITools.dll</HintPath>
+    </Reference>
+
+    <!-- ? The following DLLs cause warnings on build -->
+    <Reference Remove="**/System.IO.Compression.dll" />
+    <Reference Remove="**/System.Net.Http.dll" />
+    <Reference Remove="**/Firebase.*.dll" />
+    <Reference Remove="**/Unity.Compat.dll" />
+    <Reference Remove="**/Unity.Tasks.dll" />
+  </ItemGroup>
+</Project>
