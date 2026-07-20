@@ -124,6 +124,25 @@ namespace MultiplayerSFS.Server
 		)]
 		public int serverTickRate = 1;
 
+		[ServerConfigVariable(
+			"Enable Server GC mode for better performance on multi-core systems.",
+			"Uses more memory but reduces GC pause times.",
+			"Do not adjust unless you know what you are doing."
+		)]
+		public bool enableServerGC = true;
+
+		[ServerConfigVariable(
+			"Enable concurrent garbage collection to reduce pause times.",
+			"Do not adjust unless you know what you are doing."
+		)]
+		public bool gcConcurrent = true;
+
+		[ServerConfigVariable(
+			"Number of GC heaps. 0 = auto (usually equals CPU core count).",
+			"Do not adjust unless you know what you are doing."
+		)]
+		public int gcHeapCount = 0;
+
 		public string Serialize()
 		{
 			StringBuilder result = new StringBuilder();

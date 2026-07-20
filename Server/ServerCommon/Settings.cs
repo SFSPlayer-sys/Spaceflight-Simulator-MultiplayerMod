@@ -25,6 +25,9 @@ namespace MultiplayerSFS.ServerCommon
         public bool enableNetworkCompression = false;
         public int serverTickRate = 1;
         public string motd = "";
+        public bool enableServerGC = true;
+        public bool gcConcurrent = true;
+        public int gcHeapCount = 0;
 
         public string Serialize()
         {
@@ -47,7 +50,10 @@ namespace MultiplayerSFS.ServerCommon
                  + $"maxPacketSize={maxPacketSize}\n"
                  + $"enableNetworkCompression={enableNetworkCompression}\n"
                  + $"serverTickRate={serverTickRate}\n"
-                 + $"motd={motd}";
+                 + $"motd={motd}\n"
+                 + $"enableServerGC={enableServerGC}\n"
+                 + $"gcConcurrent={gcConcurrent}\n"
+                 + $"gcHeapCount={gcHeapCount}";
         }
 
         public static ServerSettings Deserialize(string data)
@@ -135,6 +141,18 @@ namespace MultiplayerSFS.ServerCommon
                         break;
                     case "motd":
                         settings.motd = value;
+                        break;
+                    case "enableServerGC":
+                        if (bool.TryParse(value, out bool serverGC))
+                            settings.enableServerGC = serverGC;
+                        break;
+                    case "gcConcurrent":
+                        if (bool.TryParse(value, out bool concurrent))
+                            settings.gcConcurrent = concurrent;
+                        break;
+                    case "gcHeapCount":
+                        if (int.TryParse(value, out int heapCount))
+                            settings.gcHeapCount = heapCount;
                         break;
                 }
             }
