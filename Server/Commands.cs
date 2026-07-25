@@ -365,8 +365,8 @@ namespace MultiplayerSFS.Server
             "  <message>: The message content to broadcast\n" +
             "  [player]: Optional, default is \"all\" (all players), or specify a player's username\n" +
             "  [type]: Optional, default is \"message\" (chat message), or \"toast\" (floating window)\n" +
-            "  [color]: Optional, default is server message color, or specify in #RRGGBB format\n" +
-            "Example: broadcast Welcome to the server PLAYER1 message #66ccff";
+            "  [color]: Optional, default is server message color, or specify in #RRGGBB or #RRGGBBAA format\n" +
+            "Example: broadcast Welcome to the server PLAYER1 message #66ccff or broadcast Hello all message #FF000080 (semi-transparent red)";
 
         public override string Run(string[] args, NetConnection sender)
         {
@@ -397,7 +397,7 @@ namespace MultiplayerSFS.Server
                     type = arg.ToLower();
                     index++;
                 }
-                else if (arg.StartsWith("#") && arg.Length == 7)
+                else if (arg.StartsWith("#") && (arg.Length == 7 || arg.Length == 9))
                 {
                     color = arg;
                     index++;
@@ -423,7 +423,7 @@ namespace MultiplayerSFS.Server
                         remainingArgs.RemoveAt(i);
                         i--;
                     }
-                    else if (arg.StartsWith("#") && arg.Length == 7)
+                    else if (arg.StartsWith("#") && (arg.Length == 7 || arg.Length == 9))
                     {
                         color = arg;
                         remainingArgs.RemoveAt(i);
@@ -458,14 +458,19 @@ namespace MultiplayerSFS.Server
 
             // Parse color
             System.Drawing.Color broadcastColor = System.Drawing.Color.White;
-            if (!string.IsNullOrEmpty(color) && color.StartsWith("#") && color.Length == 7)
+            if (!string.IsNullOrEmpty(color) && color.StartsWith("#") && (color.Length == 7 || color.Length == 9))
             {
                 try
                 {
                     int r = Convert.ToInt32(color.Substring(1, 2), 16);
                     int g = Convert.ToInt32(color.Substring(3, 2), 16);
                     int b = Convert.ToInt32(color.Substring(5, 2), 16);
-                    broadcastColor = System.Drawing.Color.FromArgb(r, g, b);
+                    int a = 255;
+                    if (color.Length == 9)
+                    {
+                        a = Convert.ToInt32(color.Substring(7, 2), 16);
+                    }
+                    broadcastColor = System.Drawing.Color.FromArgb(a, r, g, b);
                 }
                 catch {}
             }

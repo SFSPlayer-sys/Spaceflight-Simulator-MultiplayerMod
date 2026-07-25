@@ -71,6 +71,14 @@ namespace MultiplayerSFS.Server
 		public string motd = "Welcome to the server!";
 
 		[ServerConfigVariable(
+			"Color of the MOTD message.",
+			"Format: hex color code (without #). Example: 0000FFFF for blue with full opacity.",
+			"Supports RRGGBB (6 digits) or RRGGBBAA (8 digits) format.",
+			"Default: 0000FFFF (blue with full opacity)"
+		)]
+		public string motdColor = "0000FFFF";
+
+		[ServerConfigVariable(
 			"Rocket update interval in milliseconds. Updates per second = 1000 / updateRocketsPeriod",
 			"Do not adjust unless you know what you are doing."
 		)]

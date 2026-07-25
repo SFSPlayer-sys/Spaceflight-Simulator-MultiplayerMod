@@ -399,6 +399,29 @@ namespace MultiplayerSFS.Server
 			// 发送 MOTD 给新玩家
 			if (!string.IsNullOrWhiteSpace(settings.motd))
 			{
+				System.Drawing.Color motdColor = System.Drawing.Color.Blue;
+				if (!string.IsNullOrWhiteSpace(settings.motdColor))
+				{
+					string colorStr = settings.motdColor;
+					int r = 0, g = 0, b = 0, a = 255;
+					
+					if (colorStr.Length == 6 || colorStr.Length == 8)
+					{
+						try
+						{
+							r = Convert.ToInt32(colorStr.Substring(0, 2), 16);
+							g = Convert.ToInt32(colorStr.Substring(2, 2), 16);
+							b = Convert.ToInt32(colorStr.Substring(4, 2), 16);
+							if (colorStr.Length == 8)
+							{
+								a = Convert.ToInt32(colorStr.Substring(6, 2), 16);
+							}
+							motdColor = System.Drawing.Color.FromArgb(a, r, g, b);
+						}
+						catch {}
+					}
+				}
+				
 				SendPacketToPlayer
 				(
 					connection,
@@ -406,7 +429,7 @@ namespace MultiplayerSFS.Server
 					{
 						SenderId = -1,
 						Message = settings.motd,
-						Color = System.Drawing.Color.FromArgb(255, 255, 204, 51),
+						Color = motdColor,
 					}
 				);
 			}

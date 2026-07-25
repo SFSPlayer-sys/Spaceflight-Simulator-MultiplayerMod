@@ -69,3 +69,7 @@ A (WIP) multiplayer mod for the game Spaceflight Simulator.
 | | - `infinitebuildarea` – Unlimited build area |
 | | - `partclipping` – Allow part clipping |
 | | **Example:** `/cheat infinitefuel true` |
+
+
+Based On
+This mod is based on the repository MultiplayerSFS (GitHub - AstroTheRabbit/Multiplayer-SFS) by Astro The Rabbit.

@@ -25,6 +25,7 @@ namespace MultiplayerSFS.ServerCommon
         public bool enableNetworkCompression = false;
         public int serverTickRate = 1;
         public string motd = "";
+        public string motdColor = "0000FFFF";
         public bool enableServerGC = true;
         public bool gcConcurrent = true;
         public int gcHeapCount = 0;
@@ -51,6 +52,7 @@ namespace MultiplayerSFS.ServerCommon
                  + $"enableNetworkCompression={enableNetworkCompression}\n"
                  + $"serverTickRate={serverTickRate}\n"
                  + $"motd={motd}\n"
+                 + $"motdColor={motdColor}\n"
                  + $"enableServerGC={enableServerGC}\n"
                  + $"gcConcurrent={gcConcurrent}\n"
                  + $"gcHeapCount={gcHeapCount}";
@@ -141,6 +143,9 @@ namespace MultiplayerSFS.ServerCommon
                         break;
                     case "motd":
                         settings.motd = value;
+                        break;
+                    case "motdColor":
+                        settings.motdColor = value;
                         break;
                     case "enableServerGC":
                         if (bool.TryParse(value, out bool serverGC))
