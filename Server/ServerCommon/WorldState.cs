@@ -8,7 +8,7 @@ namespace MultiplayerSFS.ServerCommon
     public static class IDExtensions
     {
         static readonly Random generator = new Random();
-        public static int InsertNew<T>(this Dictionary<int, T> dict, T item)
+        public static int InsertNew<T>(this Dictionary<int, T> dict, T item) where T : class
         {
             int id;
             do
@@ -68,6 +68,8 @@ namespace MultiplayerSFS.ServerCommon
         public bool noBurnMarks;
         public bool infiniteBuildArea;
         public bool partClipping;
+        
+        private string savePath;
 
         public WorldState()
         {
@@ -76,48 +78,523 @@ namespace MultiplayerSFS.ServerCommon
 
         public WorldState(string path)
         {
+            savePath = path;
             try
             {
-                // Try to load world state from file
+                string settingsPath = System.IO.Path.Combine(path, "WorldSettings.txt");
+                if (!System.IO.File.Exists(settingsPath))
+                {
+                    Logger.Info($"WorldSettings.txt not found at: {path}", true);
+                    Logger.Info("Creating new world structure...", true);
+                    CreateNewWorld(path);
+                }
+                
                 LoadWorldStateFromFile(path);
-                Console.WriteLine($"[INFO] World state loaded from {path}");
+                Logger.Info($"World state loaded from {path}", true);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[WARNING] Failed to load world state: {ex.Message}");
-                Console.WriteLine($"[WARNING] Using default world state values.");
+                Logger.Warning($"Failed to load world state: {ex.Message}");
+                Logger.Warning("Using default world state values.");
                 InitializeWithDefaults();
+            }
+        }
+        
+        public void SaveWorld()
+        {
+            if (string.IsNullOrEmpty(savePath))
+            {
+                Logger.Warning("Cannot save world: save path is not set");
+                return;
+            }
+            
+            try
+            {
+                Logger.Info("Saving world state...", true);
+                
+                long currentTicks = DateTime.Now.Ticks;
+                double worldTime = WorldTime;
+                
+                string worldSettingsJson = $"{{\"solarSystem\":{{\"name\":\"{solarSystemName}\"}},\"mode\":{{\"mode\":0,\"allowQuicksaves\":true}},\"difficulty\":{{\"difficulty\":{difficulty}}},\"playtime\":{{\"lastPlayedTime_Ticks\":{currentTicks},\"totalPlayTime_Seconds\":{worldTime}}},\"cheats\":{{\"infiniteFuel\":{infiniteFuel.ToString().ToLower()},\"noAtmosphericDrag\":{noAtmosphericDrag.ToString().ToLower()},\"unbreakableParts\":{unbreakableParts.ToString().ToLower()},\"noGravity\":{noGravity.ToString().ToLower()},\"noHeatDamage\":{noHeatDamage.ToString().ToLower()},\"noBurnMarks\":{noBurnMarks.ToString().ToLower()},\"infiniteBuildArea\":{infiniteBuildArea.ToString().ToLower()},\"partClipping\":{partClipping.ToString().ToLower()}}}}}";
+                
+                string persistentPath = System.IO.Path.Combine(savePath, "Persistent");
+                
+                System.IO.File.WriteAllText(System.IO.Path.Combine(savePath, "WorldSettings.txt"), worldSettingsJson);
+                System.IO.File.WriteAllText(System.IO.Path.Combine(persistentPath, "WorldState.txt"), $"{{\"worldTime\":{worldTime},\"timewarpPhase\":0,\"mapView\":false,\"mapPosition\":{{\"x\":0.0,\"y\":0.0,\"z\":0.0}},\"mapAddress\":\"\",\"targetAddress\":\"null\",\"playerAddress\":\"null\",\"cameraDistance\":0.0}}");
+                
+                string rocketsJson = SerializeRocketsToJson();
+                System.IO.File.WriteAllText(System.IO.Path.Combine(persistentPath, "Rockets.txt"), rocketsJson);
+                
+                Logger.Info($"World saved successfully at: {savePath}", true);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"Failed to save world: {ex.Message}");
+            }
+        }
+        
+        private string SerializeRocketsToJson()
+        {
+            if (rockets == null || rockets.Count == 0)
+                return "[]";
+            
+            System.Text.StringBuilder sb = new System.Text.StringBuilder();
+            sb.Append("[");
+            
+            bool first = true;
+            foreach (var kvp in rockets)
+            {
+                if (!first)
+                    sb.Append(",");
+                first = false;
+                
+                RocketState rocket = kvp.Value;
+                sb.Append("{");
+                sb.Append($"\"rocketName\":\"{EscapeJson(rocket.rocketName)}\",");
+                sb.Append($"\"location\":{{\"position\":{{\"x\":{rocket.location.position.x},\"y\":{rocket.location.position.y}}},\"velocity\":{{\"x\":{rocket.location.velocity.x},\"y\":{rocket.location.velocity.y}}},\"address\":\"{EscapeJson(rocket.location.address)}\"}},");
+                sb.Append($"\"rotation\":{rocket.rotation},");
+                sb.Append($"\"angularVelocity\":{rocket.angularVelocity},");
+                sb.Append($"\"throttleOn\":{rocket.throttleOn.ToString().ToLower()},");
+                sb.Append($"\"throttlePercent\":{rocket.throttlePercent},");
+                sb.Append($"\"RCS\":{rocket.RCS.ToString().ToLower()},");
+                
+                sb.Append("\"parts\":[");
+                bool firstPart = true;
+                foreach (var partKvp in rocket.parts)
+                {
+                    if (!firstPart)
+                        sb.Append(",");
+                    firstPart = false;
+                    
+                    PartState part = partKvp.Value;
+                    sb.Append("{");
+                    sb.Append($"\"name\":\"{EscapeJson(part.part.name)}\",");
+                    sb.Append($"\"position\":{{\"x\":{part.part.position.x},\"y\":{part.part.position.y}}},");
+                    sb.Append($"\"orientation\":{{\"x\":{part.part.orientation.x},\"y\":{part.part.orientation.y},\"z\":{part.part.orientation.z}}},");
+                    sb.Append($"\"temperature\":{part.part.temperature},");
+                    sb.Append("\"NUMBER_VARIABLES\":{");
+                    bool firstNumVar = true;
+                    foreach (var numVar in part.part.NUMBER_VARIABLES)
+                    {
+                        if (!firstNumVar)
+                            sb.Append(",");
+                        firstNumVar = false;
+                        sb.Append($"\"{EscapeJson(numVar.Key)}\":{numVar.Value}");
+                    }
+                    sb.Append("},");
+                    sb.Append("\"TOGGLE_VARIABLES\":{");
+                    bool firstToggleVar = true;
+                    foreach (var toggleVar in part.part.TOGGLE_VARIABLES)
+                    {
+                        if (!firstToggleVar)
+                            sb.Append(",");
+                        firstToggleVar = false;
+                        sb.Append($"\"{EscapeJson(toggleVar.Key)}\":{toggleVar.Value.ToString().ToLower()}");
+                    }
+                    sb.Append("},");
+                    sb.Append("\"TEXT_VARIABLES\":{");
+                    bool firstTextVar = true;
+                    foreach (var textVar in part.part.TEXT_VARIABLES)
+                    {
+                        if (!firstTextVar)
+                            sb.Append(",");
+                        firstTextVar = false;
+                        sb.Append($"\"{EscapeJson(textVar.Key)}\":\"{EscapeJson(textVar.Value)}\"");
+                    }
+                    sb.Append("},");
+                    sb.Append("\"burns\":{");
+                    if (part.part.burns != null)
+                    {
+                        sb.Append($"\"angle\":{part.part.burns.angle},");
+                        sb.Append($"\"intensity\":{part.part.burns.intensity},");
+                        sb.Append($"\"x\":{part.part.burns.x},");
+                        sb.Append($"\"top\":\"{EscapeJson(part.part.burns.top)}\",");
+                        sb.Append($"\"bottom\":\"{EscapeJson(part.part.burns.bottom)}\"");
+                    }
+                    sb.Append("}");
+                    sb.Append("}");
+                }
+                sb.Append("],");
+                
+                sb.Append("\"joints\":[");
+                bool firstJoint = true;
+                foreach (var joint in rocket.joints)
+                {
+                    if (!firstJoint)
+                        sb.Append(",");
+                    firstJoint = false;
+                    sb.Append($"{{\"partIndex_A\":{joint.id_A},\"partIndex_B\":{joint.id_B}}}");
+                }
+                sb.Append("],");
+                
+                sb.Append("\"stages\":[");
+                bool firstStage = true;
+                foreach (var stage in rocket.stages)
+                {
+                    if (!firstStage)
+                        sb.Append(",");
+                    firstStage = false;
+                    sb.Append($"{{\"stageId\":{stage.stageID},\"partIndexes\":[");
+                    bool firstPartIdx = true;
+                    foreach (var partIdx in stage.partIDs)
+                    {
+                        if (!firstPartIdx)
+                            sb.Append(",");
+                        firstPartIdx = false;
+                        sb.Append(partIdx);
+                    }
+                    sb.Append("]}}");
+                }
+                sb.Append("]");
+                
+                sb.Append("}");
+            }
+            
+            sb.Append("]");
+            return sb.ToString();
+        }
+        
+        private string EscapeJson(string value)
+        {
+            if (value == null)
+                return "";
+            return value.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", "\\n").Replace("\r", "\\r");
+        }
+        
+        private void CreateNewWorld(string path)
+        {
+            Logger.Info("\n=== World Creation ===", true);
+            Logger.Info("Please enter world settings:", true);
+            
+            Console.Write("Difficulty (0=Normal, 1=Hard, 2=Realistic, default: 0): ");
+            string difficultyInput = Console.ReadLine();
+            int difficulty = 0;
+            if (!string.IsNullOrWhiteSpace(difficultyInput) && int.TryParse(difficultyInput, out int parsedDifficulty))
+            {
+                difficulty = Math.Clamp(parsedDifficulty, 0, 2);
+            }
+            
+            Console.Write("Configure cheat settings? (y/n, default: n): ");
+            string configureCheatsInput = Console.ReadLine();
+            bool configureCheats = !string.IsNullOrWhiteSpace(configureCheatsInput) && configureCheatsInput.Trim().ToLower() == "y";
+            
+            bool infiniteFuel = false;
+            bool noAtmosphericDrag = false;
+            bool unbreakableParts = false;
+            bool noGravity = false;
+            bool noHeatDamage = false;
+            bool noBurnMarks = false;
+            bool infiniteBuildArea = false;
+            bool partClipping = false;
+            
+            if (configureCheats)
+            {
+                Logger.Info("\n=== Cheat Settings ===", true);
+                Console.Write("Infinite fuel (true/false, default: false): ");
+                string infiniteFuelInput = Console.ReadLine();
+                infiniteFuel = !string.IsNullOrWhiteSpace(infiniteFuelInput) && bool.TryParse(infiniteFuelInput, out bool parsedInfiniteFuel) && parsedInfiniteFuel;
+                
+                Console.Write("No atmospheric drag (true/false, default: false): ");
+                string noAtmosphericDragInput = Console.ReadLine();
+                noAtmosphericDrag = !string.IsNullOrWhiteSpace(noAtmosphericDragInput) && bool.TryParse(noAtmosphericDragInput, out bool parsedNoAtmosphericDrag) && parsedNoAtmosphericDrag;
+                
+                Console.Write("Unbreakable parts (true/false, default: false): ");
+                string unbreakablePartsInput = Console.ReadLine();
+                unbreakableParts = !string.IsNullOrWhiteSpace(unbreakablePartsInput) && bool.TryParse(unbreakablePartsInput, out bool parsedUnbreakableParts) && parsedUnbreakableParts;
+                
+                Console.Write("No gravity (true/false, default: false): ");
+                string noGravityInput = Console.ReadLine();
+                noGravity = !string.IsNullOrWhiteSpace(noGravityInput) && bool.TryParse(noGravityInput, out bool parsedNoGravity) && parsedNoGravity;
+                
+                Console.Write("No heat damage (true/false, default: false): ");
+                string noHeatDamageInput = Console.ReadLine();
+                noHeatDamage = !string.IsNullOrWhiteSpace(noHeatDamageInput) && bool.TryParse(noHeatDamageInput, out bool parsedNoHeatDamage) && parsedNoHeatDamage;
+                
+                Console.Write("No burn marks (true/false, default: false): ");
+                string noBurnMarksInput = Console.ReadLine();
+                noBurnMarks = !string.IsNullOrWhiteSpace(noBurnMarksInput) && bool.TryParse(noBurnMarksInput, out bool parsedNoBurnMarks) && parsedNoBurnMarks;
+                
+                Console.Write("Infinite build area (true/false, default: false): ");
+                string infiniteBuildAreaInput = Console.ReadLine();
+                infiniteBuildArea = !string.IsNullOrWhiteSpace(infiniteBuildAreaInput) && bool.TryParse(infiniteBuildAreaInput, out bool parsedInfiniteBuildArea) && parsedInfiniteBuildArea;
+                
+                Console.Write("Part clipping (true/false, default: false): ");
+                string partClippingInput = Console.ReadLine();
+                partClipping = !string.IsNullOrWhiteSpace(partClippingInput) && bool.TryParse(partClippingInput, out bool parsedPartClipping) && parsedPartClipping;
+            }
+            
+            long currentTicks = DateTime.Now.Ticks;
+            
+            string worldSettingsJson = $"{{\"solarSystem\":{{\"name\":\"\"}},\"mode\":{{\"mode\":0,\"allowQuicksaves\":true}},\"difficulty\":{{\"difficulty\":{difficulty}}},\"playtime\":{{\"lastPlayedTime_Ticks\":{currentTicks},\"totalPlayTime_Seconds\":0.0}},\"cheats\":{{\"infiniteFuel\":{infiniteFuel.ToString().ToLower()},\"noAtmosphericDrag\":{noAtmosphericDrag.ToString().ToLower()},\"unbreakableParts\":{unbreakableParts.ToString().ToLower()},\"noGravity\":{noGravity.ToString().ToLower()},\"noHeatDamage\":{noHeatDamage.ToString().ToLower()},\"noBurnMarks\":{noBurnMarks.ToString().ToLower()},\"infiniteBuildArea\":{infiniteBuildArea.ToString().ToLower()},\"partClipping\":{partClipping.ToString().ToLower()}}}}}";
+            
+            try
+            {
+                System.IO.Directory.CreateDirectory(path);
+                
+                string persistentPath = System.IO.Path.Combine(path, "Persistent");
+                System.IO.Directory.CreateDirectory(persistentPath);
+                
+                System.IO.File.WriteAllText(System.IO.Path.Combine(path, "WorldSettings.txt"), worldSettingsJson);
+                
+                System.IO.File.WriteAllText(System.IO.Path.Combine(persistentPath, "Achievements.txt"), "[]");
+                System.IO.File.WriteAllText(System.IO.Path.Combine(persistentPath, "Branches.txt"), "{}");
+                System.IO.File.WriteAllText(System.IO.Path.Combine(persistentPath, "Challenges.txt"), "{}");
+                System.IO.File.WriteAllText(System.IO.Path.Combine(persistentPath, "Rockets.txt"), "{}");
+                System.IO.File.WriteAllText(System.IO.Path.Combine(persistentPath, "Version.txt"), "\"1.5.10.2\"");
+                System.IO.File.WriteAllText(System.IO.Path.Combine(persistentPath, "WorldState.txt"), "{}");
+                
+                Logger.Info($"World structure created at: {path}", true);
+                Logger.Info($"Difficulty: {difficulty} (0=Normal, 1=Hard, 2=Realistic)", true);
+                
+                this.solarSystemName = "";
+                this.difficulty = difficulty;
+                this.infiniteFuel = infiniteFuel;
+                this.noAtmosphericDrag = noAtmosphericDrag;
+                this.unbreakableParts = unbreakableParts;
+                this.noGravity = noGravity;
+                this.noHeatDamage = noHeatDamage;
+                this.noBurnMarks = noBurnMarks;
+                this.infiniteBuildArea = infiniteBuildArea;
+                this.partClipping = partClipping;
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"Failed to create world structure: {ex.Message}");
+                throw;
             }
         }
 
         private void LoadWorldStateFromFile(string path)
         {
-            // 设置默认值
-            InitializeWithDefaults();
+            rockets = new Dictionary<int, RocketState>();
             
             try
             {
-                // 读取WorldSettings.txt文件
                 string settingsPath = System.IO.Path.Combine(path, "WorldSettings.txt");
                 if (!System.IO.File.Exists(settingsPath))
                 {
-                    Console.WriteLine($"[WARNING] WorldSettings.txt not found at: {settingsPath}");
+                    Logger.Warning($"WorldSettings.txt not found at: {settingsPath}");
                     return;
                 }
                 
                 string jsonContent = System.IO.File.ReadAllText(settingsPath);
-                Console.WriteLine($"[INFO] Reading WorldSettings.txt from: {settingsPath}");
+                Logger.Info($"Reading WorldSettings.txt from: {settingsPath}");
                 
-                // 解析JSON获取星系名称
                 solarSystemName = ExtractSolarSystemNameFromJson(jsonContent);
-                Console.WriteLine($"[INFO] Loaded solar system: '{solarSystemName}'");
+                Logger.Info($"Loaded solar system: '{solarSystemName}'");
                 
-                // 这里可以添加更多的世界状态加载逻辑
+                difficulty = ExtractDifficultyFromJson(jsonContent);
+                Logger.Info($"Loaded difficulty: {difficulty} (0=Normal, 1=Hard, 2=Realistic)", true);
+                
+                ExtractCheatSettingsFromJson(jsonContent);
+                Logger.Info("Loaded cheat settings", true);
+                
+                string persistentPath = System.IO.Path.Combine(path, "Persistent");
+                string worldStatePath = System.IO.Path.Combine(persistentPath, "WorldState.txt");
+                if (System.IO.File.Exists(worldStatePath))
+                {
+                    string worldStateJson = System.IO.File.ReadAllText(worldStatePath);
+                    double loadedWorldTime = ExtractWorldTimeFromJson(worldStateJson);
+                    if (loadedWorldTime > 0)
+                    {
+                        WorldTime = loadedWorldTime;
+                        Logger.Info($"Loaded world time: {loadedWorldTime}", true);
+                    }
+                }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ERROR] Failed to load world settings: {ex.Message}");
+                Logger.Error($"Failed to load world settings: {ex.Message}");
                 throw;
+            }
+        }
+        
+        private double ExtractWorldTimeFromJson(string json)
+        {
+            try
+            {
+                int worldTimeIndex = json.IndexOf("\"worldTime\"");
+                if (worldTimeIndex == -1)
+                {
+                    Logger.Warning("'worldTime' field not found in WorldState.txt");
+                    return 0;
+                }
+                
+                int colonIndex = json.IndexOf(":", worldTimeIndex);
+                if (colonIndex == -1)
+                {
+                    Logger.Warning("Could not find worldTime value colon");
+                    return 0;
+                }
+                
+                int valueStart = colonIndex + 1;
+                while (valueStart < json.Length && (json[valueStart] == ' ' || json[valueStart] == '\n' || json[valueStart] == '\r'))
+                {
+                    valueStart++;
+                }
+                
+                int valueEnd = valueStart;
+                while (valueEnd < json.Length && (char.IsDigit(json[valueEnd]) || json[valueEnd] == '.'))
+                {
+                    valueEnd++;
+                }
+                
+                if (double.TryParse(json.Substring(valueStart, valueEnd - valueStart), out double parsedWorldTime))
+                {
+                    return parsedWorldTime;
+                }
+                
+                Logger.Warning("Could not parse worldTime value");
+                return 0;
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"Failed to parse world time: {ex.Message}");
+                return 0;
+            }
+        }
+        
+        private int ExtractDifficultyFromJson(string json)
+        {
+            try
+            {
+                int difficultyIndex = json.IndexOf("\"difficulty\"");
+                if (difficultyIndex == -1)
+                {
+                    Logger.Warning("'difficulty' field not found in WorldSettings.txt");
+                    return 0;
+                }
+                
+                int objectStart = json.IndexOf("{", difficultyIndex);
+                if (objectStart == -1)
+                {
+                    Logger.Warning("Could not find difficulty object");
+                    return 0;
+                }
+                
+                int valueIndex = json.IndexOf("\"difficulty\"", objectStart);
+                if (valueIndex == -1)
+                {
+                    Logger.Warning("'difficulty' value field not found in difficulty object");
+                    return 0;
+                }
+                
+                int colonIndex = json.IndexOf(":", valueIndex);
+                if (colonIndex == -1)
+                {
+                    Logger.Warning("Could not find difficulty value colon");
+                    return 0;
+                }
+                
+                int valueStart = colonIndex + 1;
+                while (valueStart < json.Length && (json[valueStart] == ' ' || json[valueStart] == '\n' || json[valueStart] == '\r'))
+                {
+                    valueStart++;
+                }
+                
+                int valueEnd = valueStart;
+                while (valueEnd < json.Length && char.IsDigit(json[valueEnd]))
+                {
+                    valueEnd++;
+                }
+                
+                if (int.TryParse(json.Substring(valueStart, valueEnd - valueStart), out int parsedDifficulty))
+                {
+                    return parsedDifficulty;
+                }
+                
+                Logger.Warning("Could not parse difficulty value");
+                return 0;
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"Failed to parse difficulty: {ex.Message}");
+                return 0;
+            }
+        }
+        
+        private void ExtractCheatSettingsFromJson(string json)
+        {
+            try
+            {
+                int cheatsIndex = json.IndexOf("\"cheats\"");
+                if (cheatsIndex == -1)
+                {
+                    Logger.Warning("'cheats' field not found in WorldSettings.txt");
+                    return;
+                }
+                
+                int objectStart = json.IndexOf("{", cheatsIndex);
+                if (objectStart == -1)
+                {
+                    Logger.Warning("Could not find cheats object");
+                    return;
+                }
+                
+                int objectEnd = FindMatchingBrace(json, objectStart);
+                if (objectEnd == -1)
+                {
+                    Logger.Warning("Could not find end of cheats object");
+                    return;
+                }
+                
+                string cheatsJson = json.Substring(objectStart, objectEnd - objectStart + 1);
+                
+                infiniteFuel = ExtractBoolFromJson(cheatsJson, "infiniteFuel");
+                noAtmosphericDrag = ExtractBoolFromJson(cheatsJson, "noAtmosphericDrag");
+                unbreakableParts = ExtractBoolFromJson(cheatsJson, "unbreakableParts");
+                noGravity = ExtractBoolFromJson(cheatsJson, "noGravity");
+                noHeatDamage = ExtractBoolFromJson(cheatsJson, "noHeatDamage");
+                noBurnMarks = ExtractBoolFromJson(cheatsJson, "noBurnMarks");
+                infiniteBuildArea = ExtractBoolFromJson(cheatsJson, "infiniteBuildArea");
+                partClipping = ExtractBoolFromJson(cheatsJson, "partClipping");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"Failed to parse cheat settings: {ex.Message}");
+            }
+        }
+        
+        private int FindMatchingBrace(string json, int startIndex)
+        {
+            int depth = 0;
+            for (int i = startIndex; i < json.Length; i++)
+            {
+                if (json[i] == '{')
+                    depth++;
+                else if (json[i] == '}')
+                {
+                    depth--;
+                    if (depth == 0)
+                        return i;
+                }
+            }
+            return -1;
+        }
+        
+        private bool ExtractBoolFromJson(string json, string key)
+        {
+            try
+            {
+                int keyIndex = json.IndexOf($"\"{key}\"");
+                if (keyIndex == -1)
+                    return false;
+                
+                int colonIndex = json.IndexOf(":", keyIndex);
+                if (colonIndex == -1)
+                    return false;
+                
+                int valueStart = colonIndex + 1;
+                while (valueStart < json.Length && (json[valueStart] == ' ' || json[valueStart] == '\n' || json[valueStart] == '\r'))
+                {
+                    valueStart++;
+                }
+                
+                return json.Substring(valueStart, 4).Equals("true", StringComparison.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                return false;
             }
         }
         
@@ -125,42 +602,38 @@ namespace MultiplayerSFS.ServerCommon
         {
             try
             {
-                // 简单的JSON解析，查找solarSystem.name字段
                 int solarSystemIndex = json.IndexOf("\"solarSystem\"");
                 if (solarSystemIndex == -1)
                 {
-                    Console.WriteLine("[WARNING] 'solarSystem' field not found in WorldSettings.txt");
+                    Logger.Warning("'solarSystem' field not found in WorldSettings.txt");
                     return "";
                 }
                 
-                // 查找solarSystem对象
                 int objectStart = json.IndexOf("{", solarSystemIndex);
                 if (objectStart == -1)
                 {
-                    Console.WriteLine("[WARNING] Could not find solarSystem object");
+                    Logger.Warning("Could not find solarSystem object");
                     return "";
                 }
                 
-                // 查找name字段
                 int nameIndex = json.IndexOf("\"name\"", objectStart);
                 if (nameIndex == -1)
                 {
-                    Console.WriteLine("[WARNING] 'name' field not found in solarSystem object");
+                    Logger.Warning("'name' field not found in solarSystem object");
                     return "";
                 }
                 
-                // 提取name值
                 int valueStart = json.IndexOf("\"", nameIndex + 6);
                 if (valueStart == -1)
                 {
-                    Console.WriteLine("[WARNING] Could not find name value start");
+                    Logger.Warning("Could not find name value start");
                     return "";
                 }
                 
                 int valueEnd = json.IndexOf("\"", valueStart + 1);
                 if (valueEnd == -1)
                 {
-                    Console.WriteLine("[WARNING] Could not find name value end");
+                    Logger.Warning("Could not find name value end");
                     return "";
                 }
                 
@@ -169,7 +642,7 @@ namespace MultiplayerSFS.ServerCommon
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ERROR] Failed to parse solar system name: {ex.Message}");
+                Logger.Error($"Failed to parse solar system name: {ex.Message}");
                 return "";
             }
         }
@@ -177,11 +650,10 @@ namespace MultiplayerSFS.ServerCommon
         private void InitializeWithDefaults()
         {
             initWorldTime = 1000000.0;
-            difficulty = 1; // Normal difficulty
+            difficulty = 0;
             solarSystemName = "";
             rockets = new Dictionary<int, RocketState>();
             
-            // Default cheat settings
             infiniteFuel = false;
             noAtmosphericDrag = false;
             unbreakableParts = false;

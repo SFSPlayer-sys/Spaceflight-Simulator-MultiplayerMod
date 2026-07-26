@@ -270,7 +270,7 @@ namespace MultiplayerSFS.ServerCommon
         public int LocalId { get; set; } = -1;
         public int GlobalId { get; set; } = -1;
         public bool ForLaunch { get; set; } = false;
-        public RocketState? Rocket { get; set; }
+        public RocketState Rocket { get; set; }
 
         public override PacketType Type => PacketType.CreateRocket;
         public override void Serialize(NetOutgoingMessage msg)

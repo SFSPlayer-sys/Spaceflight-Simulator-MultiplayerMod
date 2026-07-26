@@ -57,15 +57,16 @@ namespace MultiplayerSFS.Server
     {
         public const string CommandPrefix = "/";
         internal static readonly Dictionary<string, Command> commands = new Dictionary<string, Command>()
-        {
-            { "help", new HelpCommand() },
-            { "list", new ListCommand() },
-            { "admin", new AdminCommand() },
-            { "destroy", new DestroyCommand() },
-            { "stats", new StatsCommand() },
-            { "broadcast", new BroadcastCommand() },
-            { "cheat", new CheatCommand() },
-        };
+            {
+                { "help", new HelpCommand() },
+                { "list", new ListCommand() },
+                { "admin", new AdminCommand() },
+                { "destroy", new DestroyCommand() },
+                { "stats", new StatsCommand() },
+                { "broadcast", new BroadcastCommand() },
+                { "cheat", new CheatCommand() },
+                { "save", new SaveCommand() },
+            };
 
         public static bool TryParse(string input, out string name, out string[] args)
         {
@@ -626,6 +627,28 @@ namespace MultiplayerSFS.Server
             });
 
             return $"Set {cheatName} to {value}";
+        }
+    }
+
+    public class SaveCommand : Command
+    {
+        public override string Description => "Manually saves the world state. This command requires admin privileges.";
+
+        public override string Run(string[] args, NetConnection sender)
+        {
+            if (!CheckAdmin(sender))
+            {
+                return "You do not have the required admin privileges to use this command.";
+            }
+
+            if (args.Length > 0)
+            {
+                return "Too many arguments provided. Usage: /save";
+            }
+
+            Logger.Info("Manual world save initiated by admin.", true);
+            Server.world.SaveWorld();
+            return "World saved successfully!";
         }
     }
 }

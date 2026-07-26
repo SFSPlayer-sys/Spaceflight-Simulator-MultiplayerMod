@@ -151,6 +151,11 @@ namespace MultiplayerSFS.Server
 		)]
 		public int gcHeapCount = 0;
 
+		[ServerConfigVariable(
+			"World auto-save interval in seconds."
+		)]
+		public int worldSaveInterval = 300;
+
 		public string Serialize()
 		{
 			StringBuilder result = new StringBuilder();

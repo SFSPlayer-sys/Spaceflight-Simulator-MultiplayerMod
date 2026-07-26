@@ -45,6 +45,7 @@ namespace MultiplayerSFS.Server
 				throw;
 			}
 			connectedPlayers = new Dictionary<IPEndPoint, ConnectedPlayer>();
+			lastWorldSave = DateTime.Now;
 
             server = new NetServer(npc);
 			server.Start();
@@ -66,6 +67,12 @@ namespace MultiplayerSFS.Server
 						lastAuthorityUpdate = DateTime.Now;
 					}
 					
+					if ((DateTime.Now - lastWorldSave).TotalSeconds >= settings.worldSaveInterval)
+					{
+						world.SaveWorld();
+						lastWorldSave = DateTime.Now;
+					}
+					
 					System.Threading.Thread.Sleep(1);
 				}
 			}
@@ -77,6 +84,8 @@ namespace MultiplayerSFS.Server
 
         private static DateTime lastAuthorityUpdate = DateTime.MinValue;
         private const int AuthorityUpdateIntervalMs = 200;
+        
+        private static DateTime lastWorldSave = DateTime.MinValue;
         
         private static HashSet<int> controlledRocketsCache = new HashSet<int>();
         private static Dictionary<int, Double2> playerPositionsCache = new Dictionary<int, Double2>();
