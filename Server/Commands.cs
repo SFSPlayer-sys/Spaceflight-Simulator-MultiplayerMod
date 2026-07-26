@@ -397,6 +397,11 @@ namespace MultiplayerSFS.Server
                     type = arg.ToLower();
                     index++;
                 }
+                else if (arg.ToLower() == "all")
+                {
+                    player = "all";
+                    index++;
+                }
                 else if (arg.StartsWith("#") && (arg.Length == 7 || arg.Length == 9))
                 {
                     color = arg;
@@ -412,7 +417,7 @@ namespace MultiplayerSFS.Server
             // The remaining arguments are either player name or part of the message
             if (index < argsList.Count)
             {
-                // Check if the remaining arguments contain type or color
+                // Check if the remaining arguments contain type, player, or color
                 List<string> remainingArgs = argsList.GetRange(index, argsList.Count - index);
                 for (int i = 0; i < remainingArgs.Count; i++)
                 {
@@ -420,6 +425,12 @@ namespace MultiplayerSFS.Server
                     if (arg.ToLower() == "message" || arg.ToLower() == "toast")
                     {
                         type = arg.ToLower();
+                        remainingArgs.RemoveAt(i);
+                        i--;
+                    }
+                    else if (arg.ToLower() == "all")
+                    {
+                        player = "all";
                         remainingArgs.RemoveAt(i);
                         i--;
                     }
