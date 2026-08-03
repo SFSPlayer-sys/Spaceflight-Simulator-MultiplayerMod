@@ -16,38 +16,35 @@ namespace MultiplayerSFS.Mod
     public static class TimeWarpVoting
     {
         // 当前时间加速状态
-        public static bool isTimeWarping { get; private set; } = false;
-        public static float currentTimeScale { get; private set; } = 1f;
-        
-        // 投票状态
+        public static bool IsTimeWarping { get; private set; } = false;
+        public static float CurrentTimeScale { get; private set; } = 1f;
+        public static bool CurrentPhysicsWarp { get; private set; } = false;
+
         private static int currentVoteId = 0;
         private static bool isVoting = false;
         private static float requestedTimeScale = 1f;
-        
-        // UI元素
+        private static bool requestedPhysicsWarp = false;
+
         private static ModGUI.Window voteWindow = null;
-        private static ModGUI.Window timeWarpIndicator = null;
-        
+        private static ModGUI.Button physicsWarpToggleBtn = null;
+        private static bool usePhysicsWarp = true; 
         /// <summary>
-        /// 玩家点击时间加速按钮时调用
+        /// 玩家点击时间加速按钮
         /// </summary>
         public static void OnTimeWarpRequested()
         {
             if (!ClientManager.multiplayerEnabled.Value)
             {
-                // 单人模式直接使用原版逻辑
                 WorldTime.main.AccelerateTime();
                 return;
             }
             
-            // 如果已经在时间加速中，直接停止
-            if (isTimeWarping)
+            // 已经在时间加速中，停止当前加速
+            if (IsTimeWarping)
             {
                 StopTimeWarp();
                 return;
             }
-            
-            // 显示倍率选择窗口
             ShowTimeScaleSelection();
         }
         
@@ -65,7 +62,7 @@ namespace MultiplayerSFS.Mod
                 holder.transform,
                 ModGUI.Builder.GetRandomID(),
                 300,
-                280,
+                350,
                 0,
                 0,
                 true,
@@ -133,10 +130,8 @@ namespace MultiplayerSFS.Mod
                     $"{scale}x"
                 );
             }
-            
-            // 自定义输入
+            // 自定义倍率
             ModGUI.Builder.CreateLabel(voteWindow, 280, 20, 0, 0, "Custom:");
-            
             string inputText = "5";
             var textInput = ModGUI.Builder.CreateTextInput
             (
@@ -148,8 +143,18 @@ namespace MultiplayerSFS.Mod
                 inputText,
                 (string newText) => { inputText = newText; }
             );
-            
-            // 确认按钮
+            // 物理加速
+            physicsWarpToggleBtn = ModGUI.Builder.CreateButton
+            (
+                voteWindow, 
+                280, 
+                30, 
+                0, 
+                0, 
+                TogglePhysicsWarp,
+                usePhysicsWarp ? "Physics: ON" : "Physics: OFF"
+            );
+            // 确认
             ModGUI.Builder.CreateButton
             (
                 voteWindow, 
@@ -170,8 +175,7 @@ namespace MultiplayerSFS.Mod
                 },
                 "Request Timewarp"
             );
-            
-            // 取消按钮
+            // 取消
             ModGUI.Builder.CreateButton
             (
                 voteWindow, 
@@ -185,7 +189,19 @@ namespace MultiplayerSFS.Mod
         }
         
         /// <summary>
-        /// 请求时间加速（发送投票请求到服务器）
+        /// 切换物理加速
+        /// </summary>
+        private static void TogglePhysicsWarp()
+        {
+            usePhysicsWarp = !usePhysicsWarp;
+            if (physicsWarpToggleBtn != null)
+            {
+                physicsWarpToggleBtn.Text = usePhysicsWarp ? "Physics: ON" : "Physics: OFF";
+            }
+        }
+        
+        /// <summary>
+        /// 请求时间加速
         /// </summary>
         private static void RequestTimeWarp(float timeScale)
         {
@@ -197,11 +213,11 @@ namespace MultiplayerSFS.Mod
                 {
                     TimeScale = timeScale,
                     RequesterName = LocalManager.Player?.username ?? "Unknown",
-                    PhysicsWarp = true,
+                    PhysicsWarp = usePhysicsWarp,
                 }
             );
             
-            MsgDrawer.main.Log($"Requested time warp to {timeScale}x");
+            MsgDrawer.main.Log($"Requested time warp to {timeScale}x ({(usePhysicsWarp ? "Physics" : "WorldTime")})");
         }
         
         /// <summary>
@@ -210,19 +226,19 @@ namespace MultiplayerSFS.Mod
         public static void OnVoteRequestReceived(Packet_TimeWarpVote packet)
         {
             if (isVoting)
-                return; // 已经在投票中，忽略
-            
+                return; // 已经在投票中
             currentVoteId = packet.VoteId;
             requestedTimeScale = packet.TimeScale;
+            requestedPhysicsWarp = packet.PhysicsWarp;
             isVoting = true;
             
-            ShowVoteDialog(packet.RequesterName, packet.TimeScale, packet.VoteId);
+            ShowVoteDialog(packet.RequesterName, packet.TimeScale, packet.VoteId, packet.PhysicsWarp);
         }
         
         /// <summary>
         /// 显示投票对话框
         /// </summary>
-        private static void ShowVoteDialog(string requesterName, float timeScale, int voteId)
+        private static void ShowVoteDialog(string requesterName, float timeScale, int voteId, bool physicsWarp)
         {
             if (voteWindow != null)
                 return;
@@ -233,7 +249,7 @@ namespace MultiplayerSFS.Mod
                 holder.transform,
                 ModGUI.Builder.GetRandomID(),
                 300,
-                150,
+                180,
                 0,
                 0,
                 true,
@@ -259,7 +275,16 @@ namespace MultiplayerSFS.Mod
                 0, 
                 $"{requesterName} requests {timeScale}x timewarp"
             );
-            
+            // 显示加速类型
+            ModGUI.Builder.CreateLabel
+            (
+                voteWindow, 
+                280, 
+                20, 
+                0, 
+                0, 
+                $"Mode: {(physicsWarp ? "Physics" : "WorldTime")}"
+            );
             var buttonContainer = ModGUI.Builder.CreateContainer(voteWindow);
             buttonContainer.CreateLayoutGroup
             (
@@ -312,7 +337,6 @@ namespace MultiplayerSFS.Mod
             
             MsgDrawer.main.Log(agreed ? "Voted: Agree" : "Voted: Reject");
         }
-        
         /// <summary>
         /// 收到投票结果
         /// </summary>
@@ -325,11 +349,10 @@ namespace MultiplayerSFS.Mod
                 if (packet.TimeScale == 1f && packet.VoteId == -1)
                 {
                     // 停止时间加速
-                    isTimeWarping = false;
-                    currentTimeScale = 1f;
-                    ApplyTimeScale(1f);
-                    HideTimeWarpIndicator();
-                    
+                    IsTimeWarping = false;
+                    CurrentTimeScale = 1f;
+                    CurrentPhysicsWarp = false;
+                    ApplyTimeScale(1f, false);
                     if (!string.IsNullOrEmpty(packet.StopperName))
                     {
                         MsgDrawer.main.Log($"{packet.StopperName} ended the time warp");
@@ -342,20 +365,19 @@ namespace MultiplayerSFS.Mod
                 else
                 {
                     // 开始时间加速
-                    isTimeWarping = true;
-                    currentTimeScale = packet.TimeScale;
-                    ApplyTimeScale(packet.TimeScale);
-                    MsgDrawer.main.Log($"Time warp started: {packet.TimeScale}x");
-                    ShowTimeWarpIndicator(packet.TimeScale);
+                    IsTimeWarping = true;
+                    CurrentTimeScale = packet.TimeScale;
+                    CurrentPhysicsWarp = packet.PhysicsWarp;
+                    ApplyTimeScale(packet.TimeScale, packet.PhysicsWarp);
+                    MsgDrawer.main.Log($"Time warp started: {packet.TimeScale}x ({(packet.PhysicsWarp ? "Physics" : "WorldTime")})");
                 }
             }
             else
             {
                 // 投票被拒绝
-                isTimeWarping = false;
-                currentTimeScale = 1f;
-                
-                // 显示拒绝者名字
+                IsTimeWarping = false;
+                CurrentTimeScale = 1f;
+                CurrentPhysicsWarp = false;
                 if (!string.IsNullOrEmpty(packet.RejecterName))
                 {
                     MsgDrawer.main.Log($"{packet.RejecterName} rejected the time warp request");
@@ -365,38 +387,29 @@ namespace MultiplayerSFS.Mod
                     MsgDrawer.main.Log("Time warp request rejected");
                 }
                 
-                HideTimeWarpIndicator();
-                CloseVoteWindow(); // 关闭投票窗口
+                CloseVoteWindow();
             }
         }
-        
         /// <summary>
-        /// 应用时间倍率
+        /// 应用加速
         /// </summary>
-        private static void ApplyTimeScale(float timeScale)
+        private static void ApplyTimeScale(float timeScale, bool physicsWarp)
         {
-            // 物理加速：同时调整Time.timeScale和WorldTime.timeScale
-            Time.timeScale = timeScale;
             if (WorldTime.main != null)
             {
-                // 使用反射设置timeScale字段
-                var timeScaleField = typeof(WorldTime).GetField("timeScale", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                if (timeScaleField != null)
-                {
-                    timeScaleField.SetValue(WorldTime.main, timeScale);
-                }
+                WorldTime.main.SetState(timeScale, physicsWarp, false);
             }
         }
         
         /// <summary>
-        /// 停止时间加速（任何玩家都可以停止）
+        /// 停止加速
         /// </summary>
         private static void StopTimeWarp()
         {
-            isTimeWarping = false;
-            currentTimeScale = 1f;
-            ApplyTimeScale(1f);
-            HideTimeWarpIndicator();
+            IsTimeWarping = false;
+            CurrentTimeScale = 1f;
+            CurrentPhysicsWarp = false;
+            ApplyTimeScale(1f, false);
             
             // 通知服务器
             ClientManager.SendPacket
@@ -405,92 +418,11 @@ namespace MultiplayerSFS.Mod
                 {
                     TimeScale = 1f,
                     RequesterName = LocalManager.Player?.username ?? "Unknown",
-                    PhysicsWarp = true,
+                    PhysicsWarp = false,
                 }
             );
             
             MsgDrawer.main.Log("Time warp stopped");
-        }
-        
-        /// <summary>
-        /// 显示时间加速指示器（← Xx → 样式，点击箭头停止加速）
-        /// </summary>
-        private static void ShowTimeWarpIndicator(float timeScale)
-        {
-            if (timeWarpIndicator != null)
-            {
-                UnityEngine.Object.Destroy(timeWarpIndicator.gameObject);
-                timeWarpIndicator = null;
-            }
-            
-            var holder = ModGUI.Builder.CreateHolder(ModGUI.Builder.SceneToAttach.CurrentScene, "TimeWarp Indicator");
-            timeWarpIndicator = ModGUI.Builder.CreateWindow
-            (
-                holder.transform,
-                ModGUI.Builder.GetRandomID(),
-                120,
-                40,
-                Screen.width - 130,
-                10,
-                true,
-                false,
-                0.8f,
-                ""
-            );
-            timeWarpIndicator.CreateLayoutGroup
-            (
-                ModGUI.Type.Horizontal,
-                TextAnchor.MiddleCenter,
-                spacing: 2f,
-                padding: new RectOffset(2, 2, 2, 2)
-            );
-            
-            // 左箭头按钮 - 点击停止时间加速
-            ModGUI.Builder.CreateButton
-            (
-                timeWarpIndicator, 
-                30, 
-                32, 
-                0, 
-                0, 
-                StopTimeWarp,
-                "\u2190"
-            );
-            
-            // 中间显示当前倍率
-            ModGUI.Builder.CreateLabel
-            (
-                timeWarpIndicator, 
-                50, 
-                32, 
-                0, 
-                0, 
-                $"{timeScale}x"
-            );
-            
-            // 右箭头按钮 - 点击停止时间加速
-            ModGUI.Builder.CreateButton
-            (
-                timeWarpIndicator, 
-                30, 
-                32, 
-                0, 
-                0, 
-                StopTimeWarp,
-                "\u2192"
-            );
-        }
-        
-        /// <summary>
-        /// 隐藏时间加速指示器
-        /// </summary>
-        private static void HideTimeWarpIndicator()
-        {
-            if (timeWarpIndicator != null)
-            {
-                UnityEngine.Object.Destroy(timeWarpIndicator.gameObject);
-                timeWarpIndicator = null;
-            }
         }
         
         /// <summary>
@@ -502,6 +434,7 @@ namespace MultiplayerSFS.Mod
             {
                 UnityEngine.Object.Destroy(voteWindow.gameObject);
                 voteWindow = null;
+                physicsWarpToggleBtn = null;
             }
         }
         
@@ -510,23 +443,29 @@ namespace MultiplayerSFS.Mod
         /// </summary>
         public static void Reset()
         {
-            isTimeWarping = false;
-            currentTimeScale = 1f;
+            IsTimeWarping = false;
+            CurrentTimeScale = 1f;
+            CurrentPhysicsWarp = false;
             isVoting = false;
             currentVoteId = 0;
             
             CloseVoteWindow();
-            HideTimeWarpIndicator();
             
-            Time.timeScale = 1f;
+            // 使用SetState方法重置时间
             if (WorldTime.main != null)
             {
-                // 使用反射设置timeScale字段
-                var timeScaleField = typeof(WorldTime).GetField("timeScale", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                if (timeScaleField != null)
-                {
-                    timeScaleField.SetValue(WorldTime.main, 1f);
-                }
+                WorldTime.main.SetState(1f, false, false);
+            }
+        }
+
+        /// <summary>
+        /// 同步当前时间加速状态（发射火箭后调用）
+        /// </summary>
+        public static void SyncCurrentTimeWarp()
+        {
+            if (IsTimeWarping && WorldTime.main != null)
+            {
+                ApplyTimeScale(CurrentTimeScale, CurrentPhysicsWarp);
             }
         }
     }

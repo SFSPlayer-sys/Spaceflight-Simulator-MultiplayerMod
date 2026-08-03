@@ -8,6 +8,7 @@ using SFS.UI;
 using SFS.World;
 using SFS.Parts;
 using MultiplayerSFS.Common;
+using MultiplayerSFS.Mod;
 using SFS.Variables;
 
 namespace MultiplayerSFS.Mod.Patches
@@ -85,6 +86,10 @@ namespace MultiplayerSFS.Mod.Patches
                 Rocket controllable = rockets.FirstOrDefault(r => r.hasControl.Value);
                 Rocket toControl = controllable ?? ((rockets.Length != 0) ? rockets[0] : null);
                 LocalManager.unsyncedToControl = toControl != null && locals.TryGetValue(toControl, out int idToControl) ? idToControl : -1;
+                if (TimeWarpVoting.IsTimeWarping)
+                {
+                    TimeWarpVoting.SyncCurrentTimeWarp();
+                }
             }
         }
 
@@ -162,7 +167,11 @@ namespace MultiplayerSFS.Mod.Patches
                         reason = LocalManager.TrueDestructionReason;
                         return true;
                     }
-
+                    if (reason == DestructionReason.Intentional)
+                    {
+                        ///MsgDrawer.main.Log("Cannot destroy rocket in multiplayer mode.");
+                        return false;
+                    }
                     int id = LocalManager.GetSyncedRocketID(rocket);
                     if (id < 0)
                     {
@@ -173,7 +182,6 @@ namespace MultiplayerSFS.Mod.Patches
                     if (localPlayer == null)
                         return false;
                     
-                    // 检查是否有更新权限（包括自己控制的和服务器分配的未被控制的火箭）
                     if (LocalManager.updateAuthority.Contains(id))
                     {
                         ClientManager.world.rockets.Remove(id);

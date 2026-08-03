@@ -20,8 +20,8 @@ namespace MultiplayerSFS.Mod
         public override string DisplayName => "SFS Multiplayer";
         public override string Author => "Astro The Rabbit, VerdiX,SFSGamer";
         public override string MinimumGameVersionNecessary => "1.5.10.2";
-        public override string ModVersion => "1.0";
-        public override string Description => "Adds  multiplayer to SFS!";
+        public override string ModVersion => "0.3";
+        public override string Description => "Adds multiplayer to SFS!";
 
         public override Dictionary<string, string> Dependencies { get; } = new Dictionary<string, string> { { "UITools", "1.1.5" } };
 

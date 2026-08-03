@@ -11,7 +11,7 @@ dotnet build -c Release
 if %ERRORLEVEL% NEQ 0 goto :error
 
 if not exist "%RELEASE_DIR%\Mod" mkdir "%RELEASE_DIR%\Mod"
-copy "%MOD_DIR%\bin\Release\net4.8\Mod.dll" "%RELEASE_DIR%\Mod\" /Y >nul
+copy "%MOD_DIR%\bin\Release\net4.8\Multiplayer.dll" "%RELEASE_DIR%\Mod\" /Y >nul
 copy "%MOD_DIR%\bin\Release\net4.8\Lidgren.Network.dll" "%RELEASE_DIR%\Mod\" /Y >nul
 
 cd /d "%SERVER_DIR%"
@@ -32,7 +32,7 @@ if %ERRORLEVEL% NEQ 0 goto :error
 
 set SFS_MODS_DIR=C:\Program Files (x86)\Steam\steamapps\common\Spaceflight Simulator\Spaceflight Simulator Game\Mods
 if not exist "%SFS_MODS_DIR%" mkdir "%SFS_MODS_DIR%"
-copy "%RELEASE_DIR%\Mod\Mod.dll" "%SFS_MODS_DIR%\" /Y >nul 2>&1
+copy "%RELEASE_DIR%\Mod\Multiplayer.dll" "%SFS_MODS_DIR%\" /Y >nul 2>&1
 
 start "" "%RELEASE_DIR%\Server-Windows-x64-NonSelfContained\Server.exe"
 
