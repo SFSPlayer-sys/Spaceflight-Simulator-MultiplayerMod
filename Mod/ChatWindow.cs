@@ -145,6 +145,14 @@ namespace MultiplayerSFS.Mod
                 }
                 Object.Destroy(holder_window);
             }
+            holder_window = null;
+            window = null;
+            window_messages = null;
+            input_sendMessage = null;
+            input_colorPicker = null;
+            label_colorPicker = null;
+            button_colorPicker = null;
+            container_colorPicker = null;
         }
 
         public static void OnColorPickerChange(string hueText)
@@ -231,7 +239,7 @@ namespace MultiplayerSFS.Mod
             }
         }
 
-        // 在主线程中调用此方法来处理队列中的任务
+        // 在主线程执行队列中的任务
         public static void Update()
         {
             while (true)

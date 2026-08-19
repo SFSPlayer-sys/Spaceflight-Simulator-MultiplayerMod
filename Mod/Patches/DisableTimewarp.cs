@@ -17,7 +17,7 @@ namespace MultiplayerSFS.Mod.Patches
             {
                 if (ClientManager.multiplayerEnabled.Value)
                 {
-                    // 多人模式下弹出倍率选择窗口
+                    // 弹出倍率选择窗口
                     TimeWarpVoting.OnTimeWarpRequested();
                     return false;
                 }
@@ -32,7 +32,7 @@ namespace MultiplayerSFS.Mod.Patches
             {
                 if (ClientManager.multiplayerEnabled.Value)
                 {
-                    // 多人模式下停止时间加速
+                    // 停止时间加速
                     TimeWarpVoting.OnTimeWarpRequested();
                     return false;
                 }
@@ -47,7 +47,7 @@ namespace MultiplayerSFS.Mod.Patches
             {
                 if (ClientManager.multiplayerEnabled.Value)
                 {
-                    // 多人模式下弹出倍率选择窗口
+                    // 弹出倍率选择窗口
                     TimeWarpVoting.OnTimeWarpRequested();
                     return false;
                 }

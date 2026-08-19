@@ -66,6 +66,9 @@ namespace MultiplayerSFS.Server
                 { "broadcast", new BroadcastCommand() },
                 { "cheat", new CheatCommand() },
                 { "save", new SaveCommand() },
+                { "ban", new BanCommand() },
+                { "unban", new UnbanCommand() },
+                { "banlist", new BanListCommand() },
             };
 
         public static bool TryParse(string input, out string name, out string[] args)
@@ -649,6 +652,75 @@ namespace MultiplayerSFS.Server
             Logger.Info("Manual world save initiated by admin.", true);
             Server.world.SaveWorld();
             return "World saved successfully!";
+        }
+    }
+
+    public class BanCommand : Command
+    {
+        public override string Description => $@"
+        |Bans a player by IP address or username. This command requires admin privileges.
+        |{"ban".FormatCommand("{IP/PLAYER}")}: Bans the target permanently.
+        |{"ban".FormatCommand("{IP/PLAYER} {time}")}: Bans the target for the given time in hours.
+        ".CleanDescription();
+
+        public override string Run(string[] args, NetConnection sender)
+        {
+            if (!CheckAdmin(sender))
+            {
+                return "You do not have the required admin privileges to use this command.";
+            }
+            if (args.Length == 0)
+            {
+                return "Not enough arguments provided. Usage: /ban {IP/PLAYER} {time in hours (optional)}";
+            }
+            long duration = 0;
+            if (args.Length > 1 && (!long.TryParse(args[1], out duration) || duration < 0))
+            {
+                return "Invalid time provided. The time must be a non-negative number of hours.";
+            }
+            return BanManager.BanTarget(args[0], duration);
+        }
+    }
+
+    public class UnbanCommand : Command
+    {
+        public override string Description => $@"
+        |Unbans a player by IP address or username. This command requires admin privileges.
+        |{"unban".FormatCommand("{IP/PLAYER}")}: Removes the ban for the target.
+        ".CleanDescription();
+
+        public override string Run(string[] args, NetConnection sender)
+        {
+            if (!CheckAdmin(sender))
+            {
+                return "You do not have the required admin privileges to use this command.";
+            }
+            if (args.Length != 1)
+            {
+                return "Invalid number of arguments. Usage: /unban {IP/PLAYER}";
+            }
+            return BanManager.UnbanTarget(args[0]);
+        }
+    }
+
+    public class BanListCommand : Command
+    {
+        public override string Description => $@"
+        |Shows all currently banned players. This command requires admin privileges.
+        |{"banlist".FormatCommand()}: Lists every banned IP address and username.
+        ".CleanDescription();
+
+        public override string Run(string[] args, NetConnection sender)
+        {
+            if (!CheckAdmin(sender))
+            {
+                return "You do not have the required admin privileges to use this command.";
+            }
+            if (args.Length > 0)
+            {
+                return "Too many arguments provided. Usage: /banlist";
+            }
+            return BanManager.ListBans();
         }
     }
 }

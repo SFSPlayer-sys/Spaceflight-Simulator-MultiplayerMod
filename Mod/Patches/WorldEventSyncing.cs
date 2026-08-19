@@ -94,7 +94,7 @@ namespace MultiplayerSFS.Mod.Patches
         }
 
         /// <summary>
-        /// 防止部件销毁导致的平行世界，只有HOST或控制者能处理
+        /// 防止部件销毁导致平行世界
         /// </summary>
         [HarmonyPatch(typeof(Part), nameof(Part.DestroyPart))]
         public class Part_DestroyPart
@@ -182,24 +182,20 @@ namespace MultiplayerSFS.Mod.Patches
                     if (localPlayer == null)
                         return false;
                     
-                    if (LocalManager.updateAuthority.Contains(id))
-                    {
-                        ClientManager.world.rockets.Remove(id);
-                        LocalManager.syncedRockets.Remove(id);
-                        LocalManager.updateAuthority.Remove(id);
-                        ClientManager.SendPacket
-                        (
-                            new Packet_DestroyRocket()
-                            {
-                                WorldTime = ClientManager.world.WorldTime,
-                                RocketId = id,
-                                Reason = reason,
-                            }
-                        );
-                        return true;
-                    }
-                    
-                    return false;
+                    // 本地销毁并广播给所有客户端
+                    ClientManager.world.rockets.Remove(id);
+                    LocalManager.syncedRockets.Remove(id);
+                    LocalManager.updateAuthority.Remove(id);
+                    ClientManager.SendPacket
+                    (
+                        new Packet_DestroyRocket()
+                        {
+                            WorldTime = ClientManager.world.WorldTime,
+                            RocketId = id,
+                            Reason = reason,
+                        }
+                    );
+                    return true;
                 }
                 return true;
             }
@@ -434,7 +430,7 @@ namespace MultiplayerSFS.Mod.Patches
         }
 
         /// <summary>
-        /// 只有拥有更新权限的玩家运行物理模拟，其他玩家跳过物理更新
+        /// 只有拥有更新权限的玩家运行物理模拟
         /// </summary>
         [HarmonyPatch(typeof(Rocket), "SFS.World.I_Physics.OnFixedUpdate")]
         public static class Rocket_OnFixedUpdate
@@ -455,7 +451,7 @@ namespace MultiplayerSFS.Mod.Patches
                 if (rocketId == -1)
                     return false;
                 
-                // 检查玩家是否有该火箭的更新权限（包括自己控制的和未被控制的火箭）
+                // 检查是否有该火箭的更新权限
                 if (LocalManager.updateAuthority.Contains(rocketId))
                     return true;
                 

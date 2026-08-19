@@ -17,18 +17,10 @@ namespace MultiplayerSFS.ServerCommon
         public double loadRange = 100000;
         public string worldSavePath = "";
         public string allowedGameVersions = "";
-        public int authorityUpdateInterval = 200;
         public float timeWarpMaxScale = 0f;
         public int timeWarpVoteTimeout = 30;
-        public int networkTimeout = 15;
-        public int maxPacketSize = 65536;
-        public bool enableNetworkCompression = false;
-        public int serverTickRate = 1;
         public string motd = "";
         public string motdColor = "0000FFFF";
-        public bool enableServerGC = true;
-        public bool gcConcurrent = true;
-        public int gcHeapCount = 0;
 
         public string Serialize()
         {
@@ -44,18 +36,10 @@ namespace MultiplayerSFS.ServerCommon
                  + $"loadRange={loadRange}\n"
                  + $"worldSavePath={worldSavePath}\n"
                  + $"allowedGameVersions={allowedGameVersions}\n"
-                 + $"authorityUpdateInterval={authorityUpdateInterval}\n"
                  + $"timeWarpMaxScale={timeWarpMaxScale}\n"
                  + $"timeWarpVoteTimeout={timeWarpVoteTimeout}\n"
-                 + $"networkTimeout={networkTimeout}\n"
-                 + $"maxPacketSize={maxPacketSize}\n"
-                 + $"enableNetworkCompression={enableNetworkCompression}\n"
-                 + $"serverTickRate={serverTickRate}\n"
                  + $"motd={motd}\n"
-                 + $"motdColor={motdColor}\n"
-                 + $"enableServerGC={enableServerGC}\n"
-                 + $"gcConcurrent={gcConcurrent}\n"
-                 + $"gcHeapCount={gcHeapCount}";
+                 + $"motdColor={motdColor}";
         }
 
         public static ServerSettings Deserialize(string data)
@@ -113,10 +97,6 @@ namespace MultiplayerSFS.ServerCommon
                     case "allowedGameVersions":
                         settings.allowedGameVersions = value;
                         break;
-                    case "authorityUpdateInterval":
-                        if (int.TryParse(value, out int authInterval))
-                            settings.authorityUpdateInterval = authInterval;
-                        break;
                     case "timeWarpMaxScale":
                         if (float.TryParse(value, out float maxScale))
                             settings.timeWarpMaxScale = maxScale;
@@ -125,39 +105,11 @@ namespace MultiplayerSFS.ServerCommon
                         if (int.TryParse(value, out int voteTimeout))
                             settings.timeWarpVoteTimeout = voteTimeout;
                         break;
-                    case "networkTimeout":
-                        if (int.TryParse(value, out int netTimeout))
-                            settings.networkTimeout = netTimeout;
-                        break;
-                    case "maxPacketSize":
-                        if (int.TryParse(value, out int packetSize))
-                            settings.maxPacketSize = packetSize;
-                        break;
-                    case "enableNetworkCompression":
-                        if (bool.TryParse(value, out bool compression))
-                            settings.enableNetworkCompression = compression;
-                        break;
-                    case "serverTickRate":
-                        if (int.TryParse(value, out int tickRate))
-                            settings.serverTickRate = tickRate;
-                        break;
                     case "motd":
                         settings.motd = value;
                         break;
                     case "motdColor":
                         settings.motdColor = value;
-                        break;
-                    case "enableServerGC":
-                        if (bool.TryParse(value, out bool serverGC))
-                            settings.enableServerGC = serverGC;
-                        break;
-                    case "gcConcurrent":
-                        if (bool.TryParse(value, out bool concurrent))
-                            settings.gcConcurrent = concurrent;
-                        break;
-                    case "gcHeapCount":
-                        if (int.TryParse(value, out int heapCount))
-                            settings.gcHeapCount = heapCount;
                         break;
                 }
             }

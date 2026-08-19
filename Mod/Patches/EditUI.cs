@@ -172,6 +172,9 @@ namespace MultiplayerSFS.Mod.Patches
                 {
                     Rocket rocket = __instance.GetComponent<Rocket>();
                     int id = LocalManager.GetSyncedRocketID(rocket);
+                    // 未同步的火箭保持白色
+                    if (id < 0)
+                        return;
                     foreach (LocalPlayer player in LocalManager.players.Values)
                     {
                         if (player.controlledRocket.Value == id)

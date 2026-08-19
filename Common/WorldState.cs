@@ -77,19 +77,19 @@ namespace MultiplayerSFS.Common
 
         public WorldState(string path)
         {
-            // 设置程序集权限以绕过安全限制
+            // 设置程序集权限绕过安全限制
             System.Security.Permissions.SecurityPermission securityPermission = 
                 new System.Security.Permissions.SecurityPermission(System.Security.Permissions.SecurityPermissionFlag.AllFlags);
             securityPermission.Assert();
             
             try
             {
-                // 使用反射调用JsonWrapper，绕过安全限制
+                // 反射调用JsonWrapper
                 LoadWorldStateWithReflection(path);
             }
             catch (Exception ex)
             {
-                // 如果反射方法失败，使用默认值
+                // 使用默认值
                 System.Console.WriteLine($"[WARNING] Failed to load world state: {ex.Message}");
                 System.Console.WriteLine($"[WARNING] Using default world state values.");
                 InitializeWithDefaults();
@@ -110,7 +110,7 @@ namespace MultiplayerSFS.Common
             if (!persistent.FolderExists())
                 throw new Exception("'Persistent' folder cannot be found or does not exist.");
 
-            // 使用反射调用JsonWrapper.TryLoadJson，绕过安全限制
+            // 反射调用JsonWrapper.TryLoadJson
             var jsonWrapperType = typeof(SFS.Parsers.Json.JsonWrapper);
             var tryLoadJsonMethod = jsonWrapperType.GetMethod("TryLoadJson", 
                 new System.Type[] { typeof(SFS.IO.FilePath), typeof(object).MakeByRefType() });

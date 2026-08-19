@@ -107,7 +107,7 @@ namespace MultiplayerSFS.Mod
             }
         }
 
-        // 在主线程中调用此方法来处理队列中的任务
+        // 在主线程执行队列中的任务
         public static void Update()
         {
             while (true)
@@ -350,10 +350,10 @@ namespace MultiplayerSFS.Mod
 
         public static void OnPacket_CreateRocket(Packet_CreateRocket packet)
         {
-            // 首先检查是否是已存在的火箭（父火箭更新 - 分离时）
+            // 检查是否是已存在的火箭
             if (syncedRockets.TryGetValue(packet.GlobalId, out LocalRocket existingRocket))
             {
-                // 分离时需要销毁旧火箭并重新创建，以确保部件正确更新
+                // 销毁旧火箭并重新创建
                 DestroyLocalRocket(packet.GlobalId);
                 
                 // 使用新状态重新创建火箭

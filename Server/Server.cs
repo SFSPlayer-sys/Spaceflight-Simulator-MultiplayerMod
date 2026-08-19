@@ -1,6 +1,7 @@
 using System;
 using System.Net;
 using System.Linq;
+using System.IO;
 using System.Collections.Generic;
 using Lidgren.Network;
 
@@ -23,15 +24,34 @@ namespace MultiplayerSFS.Server
 		public static void Initialize(ServerSettings settings)
 		{
 			Server.settings = settings;
-            NetPeerConfiguration npc = new NetPeerConfiguration("multiplayersfs")
-            {
-                Port = settings.port,
-				MaximumConnections = settings.maxConnections,
-            };
-			npc.EnableMessageType(NetIncomingMessageType.StatusChanged);
-			npc.EnableMessageType(NetIncomingMessageType.ConnectionApproval);
-			npc.EnableMessageType(NetIncomingMessageType.ConnectionLatencyUpdated);
-			npc.EnableMessageType(NetIncomingMessageType.VerboseDebugMessage);
+			int port = settings.port;
+			while (true)
+			{
+				try
+				{
+					NetPeerConfiguration npc = new NetPeerConfiguration("multiplayersfs")
+					{
+						Port = port,
+						MaximumConnections = settings.maxConnections,
+					};
+					npc.EnableMessageType(NetIncomingMessageType.StatusChanged);
+					npc.EnableMessageType(NetIncomingMessageType.ConnectionApproval);
+					npc.EnableMessageType(NetIncomingMessageType.ConnectionLatencyUpdated);
+					npc.EnableMessageType(NetIncomingMessageType.VerboseDebugMessage);
+					if (settings.discoveryEnabled)
+						npc.EnableMessageType(NetIncomingMessageType.DiscoveryRequest);
+					server = new NetServer(npc);
+					server.Start();
+					break;
+				}
+				catch
+				{
+					// 端口占用时换下一个端口
+					port++;
+				}
+			}
+			if (port != settings.port)
+				Logger.Info($"Port {settings.port} was unavailable, using port {port} instead.", true);
 
 			try
 			{
@@ -45,10 +65,8 @@ namespace MultiplayerSFS.Server
 				throw;
 			}
 			connectedPlayers = new Dictionary<IPEndPoint, ConnectedPlayer>();
+			BanManager.Load();
 			lastWorldSave = DateTime.Now;
-
-            server = new NetServer(npc);
-			server.Start();
 		}
 
 		public static void Run()
@@ -73,7 +91,7 @@ namespace MultiplayerSFS.Server
 						lastWorldSave = DateTime.Now;
 					}
 					
-					System.Threading.Thread.Sleep(1);
+					System.Threading.Thread.Sleep(10);
 				}
 			}
 			catch (Exception e)
@@ -146,6 +164,9 @@ namespace MultiplayerSFS.Server
 					case NetIncomingMessageType.ConnectionLatencyUpdated:
 						OnLatencyUpdated(msg);
 						break;
+					case NetIncomingMessageType.DiscoveryRequest:
+						OnDiscoveryRequest(msg);
+						break;
 					case NetIncomingMessageType.Data:
 						requiresRefresh |= OnIncomingPacket(msg);
 						break;
@@ -205,6 +226,20 @@ namespace MultiplayerSFS.Server
 		}
 
 		/// <summary>
+		/// 响应局域网发现请求
+		/// </summary>
+		static void OnDiscoveryRequest(NetIncomingMessage msg)
+		{
+			NetOutgoingMessage response = server.CreateMessage();
+			response.Write(settings.serverName);
+			response.Write(connectedPlayers.Count);
+			response.Write(settings.maxConnections);
+			response.Write(settings.allowedGameVersions);
+			response.Write(settings.serverPassword != "");
+			server.SendDiscoveryResponse(response, msg.SenderEndPoint);
+		}
+
+		/// <summary>
 		/// Returns `true` if a refresh of the players' update authorities is required.
 		/// </summary>
 		static bool OnStatusChanged(NetIncomingMessage msg)
@@ -249,7 +284,12 @@ namespace MultiplayerSFS.Server
 				reason = $"Username '{request.Username}' is already in use";
 				goto ConnectionDenied;
 			}
-			if (request.Password != settings.serverPassword && settings.serverPassword != "")
+			if (BanManager.IsBanned(request.Username, connection.RemoteEndPoint, out string banReason))
+			{
+				reason = banReason;
+				goto ConnectionDenied;
+			}
+			if (request.Password != Packet_JoinRequest.GetPasswordHash(settings.serverPassword) && settings.serverPassword != "")
 			{
 				reason = $"Invalid password";
 				goto ConnectionDenied;
@@ -278,6 +318,7 @@ namespace MultiplayerSFS.Server
 					WorldTime = world.WorldTime,
 					Difficulty = world.difficulty,
 					SolarSystemName = world.solarSystemName,
+					ServerName = settings.serverName,
 				}
 			);
 			connection.Approve(joinResponse);
@@ -292,13 +333,13 @@ namespace MultiplayerSFS.Server
 		{
 			reason = "";
 			
-			// 如果配置为空，允许所有版本
+			// 配置为空时允许所有版本
 			if (string.IsNullOrWhiteSpace(settings.allowedGameVersions))
 			{
 				return true;
 			}
 
-			// 如果客户端没有发送版本信息，拒绝连接
+			// 客户端未发送版本信息时拒绝连接
 			if (string.IsNullOrWhiteSpace(clientVersion))
 			{
 				reason = "Client version not provided";
@@ -318,10 +359,7 @@ namespace MultiplayerSFS.Server
 					return true;
 				}
 
-				// 前缀匹配：客户端版本以配置版本开头，且后面跟着点号
-				// 例如：配置 "1.5"，客户端 "1.5.10.2" → 匹配
-				// 例如：配置 "1.5.10"，客户端 "1.5.10.2" → 匹配
-				// 例如：配置 "1.5"，客户端 "1.50.0" → 不匹配（不是以 "1.5." 开头）
+				// 前缀匹配
 				if (clientVersion.StartsWith(trimmedVersion + "."))
 				{
 					return true;
@@ -661,7 +699,7 @@ namespace MultiplayerSFS.Server
 						packet,
 						msg.SenderConnection
 					);
-					// 玩家切换控制的火箭后，需要更新权限
+					// 更新玩家权限
 					UpdatePlayerAuthorities();
 				}
 				else
@@ -916,7 +954,7 @@ namespace MultiplayerSFS.Server
 			return;
 		}
 
-		// 如果已经在投票中，忽略新请求
+		// 投票中则忽略新请求
 		if (isVoting)
 		{
 			Logger.Info($"Vote already in progress, ignoring request from {requester.username}");
@@ -931,10 +969,10 @@ namespace MultiplayerSFS.Server
 		requestedPhysicsWarp = packet.PhysicsWarp;
 		currentVotes.Clear();
 		
-		// 计算投票人数（所有控制火箭的玩家）
+		// 计算投票人数
 		totalVoters = connectedPlayers.Values.Count(p => p.controlledRocket >= 0);
 		
-		// 如果只有请求者一人控制火箭，直接通过
+		// 仅一人控制时直接通过
 		if (totalVoters <= 1)
 		{
 			isVoting = false;
@@ -954,7 +992,7 @@ namespace MultiplayerSFS.Server
 			return;
 		}
 
-		// 向所有其他控制火箭的玩家发送投票请求
+		// 向其他控制火箭的玩家发送投票请求
 		foreach (KeyValuePair<IPEndPoint, ConnectedPlayer> kvp in connectedPlayers)
 		{
 			if (kvp.Value.id != requester.id && kvp.Value.controlledRocket >= 0)
@@ -985,7 +1023,7 @@ namespace MultiplayerSFS.Server
 		
 		Logger.Info($"{voter.username} voted: {(packet.Agreed ? "Agree" : "Reject")}");
 
-		// 如果有人拒绝，广播给所有玩家
+		// 有人拒绝时广播
 		if (!packet.Agreed)
 		{
 			isVoting = false;
@@ -1013,7 +1051,7 @@ namespace MultiplayerSFS.Server
 			
 			if (rejectedCount == 0)
 			{
-				// 所有人都同意，广播开始时间加速
+				// 全部同意则开始时间加速
 				isTimeWarping = true;
 				currentTimeScale = requestedTimeScale;
 				currentPhysicsWarp = requestedPhysicsWarp;
@@ -1084,6 +1122,185 @@ namespace MultiplayerSFS.Server
 			loadRange = (float)Server.settings.loadRange;
 			controlledRocket = -1;
 			updateAuthority = new HashSet<int>();
+		}
+	}
+
+	/// <summary>
+	/// 封禁记录（按 IP 或玩家名）
+	/// </summary>
+	public class BanEntry
+	{
+		public string target;
+		public bool isIP;
+		public long bannedAt;
+		public long durationSeconds;
+	}
+
+	/// <summary>
+	/// 管理封禁列表，持久化到本地 Bans.txt
+	/// </summary>
+	public static class BanManager
+	{
+		public static List<BanEntry> bans = new List<BanEntry>();
+		public static readonly string bansFilePath = "./Bans.txt";
+
+		/// <summary>
+		/// 从本地文件加载封禁列表
+		/// </summary>
+		public static void Load()
+		{
+			bans.Clear();
+			try
+			{
+				if (!File.Exists(bansFilePath))
+					return;
+				foreach (string line in File.ReadAllLines(bansFilePath))
+				{
+					string[] parts = line.Split('|');
+					if (parts.Length >= 4 && bool.TryParse(parts[0], out bool isIP) && long.TryParse(parts[2], out long bannedAt) && long.TryParse(parts[3], out long duration))
+					{
+						bans.Add(new BanEntry() { target = parts[1], isIP = isIP, bannedAt = bannedAt, durationSeconds = duration });
+					}
+				}
+			}
+			catch (Exception e)
+			{
+				Logger.Error($"Failed to load bans: {e.Message}");
+			}
+		}
+
+		/// <summary>
+		/// 保存封禁列表到本地文件
+		/// </summary>
+		public static void Save()
+		{
+			try
+			{
+				List<string> lines = new List<string>();
+				foreach (BanEntry ban in bans)
+					lines.Add($"{ban.isIP}|{ban.target}|{ban.bannedAt}|{ban.durationSeconds}");
+				File.WriteAllLines(bansFilePath, lines);
+			}
+			catch (Exception e)
+			{
+				Logger.Error($"Failed to save bans: {e.Message}");
+			}
+		}
+
+		/// <summary>
+		/// 检查是否被封禁，过期自动清理
+		/// </summary>
+		public static bool IsBanned(string username, IPEndPoint endpoint, out string reason)
+		{
+			long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+			bool changed = false;
+			foreach (BanEntry ban in bans.ToList())
+			{
+				// 封禁到期自动解除
+				if (ban.durationSeconds != 0 && now - ban.bannedAt >= ban.durationSeconds)
+				{
+					bans.Remove(ban);
+					changed = true;
+					continue;
+				}
+				bool match = ban.isIP
+					? ban.target == endpoint.Address.ToString()
+					: string.Equals(ban.target, username, StringComparison.OrdinalIgnoreCase);
+				if (match)
+				{
+					if (ban.durationSeconds == 0)
+						reason = "You are banned from this server (permanent).";
+					else
+						reason = $"You are banned from this server for another {FormatRemaining(ban.durationSeconds - (now - ban.bannedAt))}.";
+					if (changed)
+						Save();
+					return true;
+				}
+			}
+			if (changed)
+				Save();
+			reason = "";
+			return false;
+		}
+
+		/// <summary>
+		/// 封禁目标，返回结果消息
+		/// </summary>
+		public static string BanTarget(string target, long durationHours)
+		{
+			bool isIP = IPAddress.TryParse(target, out _);
+			// 防止重复封禁
+			if (bans.Any(b => b.isIP == isIP && string.Equals(b.target, target, StringComparison.OrdinalIgnoreCase)))
+				return $"'{target}' is already banned.";
+			bans.Add(new BanEntry()
+			{
+				target = target,
+				isIP = isIP,
+				bannedAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+				durationSeconds = durationHours > 0 ? durationHours * 3600 : 0,
+			});
+			Save();
+			// 封玩家名时踢出同名玩家
+			if (!isIP)
+			{
+				foreach (var kvp in Server.connectedPlayers.ToList())
+				{
+					if (string.Equals(kvp.Value.username, target, StringComparison.OrdinalIgnoreCase))
+						Server.server.GetConnection(kvp.Key)?.Disconnect("You have been banned from this server.");
+				}
+			}
+			return durationHours > 0
+				? $"Banned '{target}' for {durationHours} hour(s)."
+				: $"Banned '{target}' permanently.";
+		}
+
+		/// <summary>
+		/// 解除封禁，返回结果消息
+		/// </summary>
+		public static string UnbanTarget(string target)
+		{
+			bool isIP = IPAddress.TryParse(target, out _);
+			BanEntry match = bans.FirstOrDefault(b => b.isIP == isIP && string.Equals(b.target, target, StringComparison.OrdinalIgnoreCase));
+			if (match == null)
+				return $"'{target}' is not banned.";
+			bans.Remove(match);
+			Save();
+			return $"Unbanned '{target}'.";
+		}
+
+		/// <summary>
+		/// 列出所有封禁记录
+		/// </summary>
+		public static string ListBans()
+		{
+			if (bans.Count == 0)
+				return "No players are banned.";
+			List<string> lines = new List<string> { $"Banned players ({bans.Count}):" };
+			long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+			foreach (BanEntry ban in bans)
+			{
+				string type = ban.isIP ? "IP" : "Name";
+				string duration = ban.durationSeconds == 0
+					? "Permanent"
+					: $"Expires in {FormatRemaining(ban.durationSeconds - (now - ban.bannedAt))}";
+				lines.Add($"  {type} '{ban.target}' - {duration}");
+			}
+			return string.Join("\n", lines);
+		}
+
+		/// <summary>
+		/// 将秒数格式化为 天/小时/分钟
+		/// </summary>
+		static string FormatRemaining(long seconds)
+		{
+			long days = seconds / 86400; seconds %= 86400;
+			long hours = seconds / 3600; seconds %= 3600;
+			long minutes = seconds / 60;
+			if (days > 0)
+				return $"{days}d {hours}h {minutes}m";
+			if (hours > 0)
+				return $"{hours}h {minutes}m";
+			return $"{minutes}m";
 		}
 	}
 }

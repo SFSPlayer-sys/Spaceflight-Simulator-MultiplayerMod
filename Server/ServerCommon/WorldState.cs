@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.Collections.Generic;
+using System.Globalization;
 using Lidgren.Network;
 
 namespace MultiplayerSFS.ServerCommon
@@ -90,6 +91,7 @@ namespace MultiplayerSFS.ServerCommon
                 }
                 
                 LoadWorldStateFromFile(path);
+                LoadRocketsFromFile(path);
                 Logger.Info($"World state loaded from {path}", true);
             }
             catch (Exception ex)
@@ -168,6 +170,7 @@ namespace MultiplayerSFS.ServerCommon
                     
                     PartState part = partKvp.Value;
                     sb.Append("{");
+                    sb.Append($"\"id\":{partKvp.Key},");
                     sb.Append($"\"name\":\"{EscapeJson(part.part.name)}\",");
                     sb.Append($"\"position\":{{\"x\":{part.part.position.x},\"y\":{part.part.position.y}}},");
                     sb.Append($"\"orientation\":{{\"x\":{part.part.orientation.x},\"y\":{part.part.orientation.y},\"z\":{part.part.orientation.z}}},");
@@ -407,6 +410,374 @@ namespace MultiplayerSFS.ServerCommon
                 Logger.Error($"Failed to load world settings: {ex.Message}");
                 throw;
             }
+        }
+
+        /// <summary>
+        /// 从存档加载火箭列表
+        /// </summary>
+        private void LoadRocketsFromFile(string path)
+        {
+            rockets = new Dictionary<int, RocketState>();
+            string rocketsPath = System.IO.Path.Combine(path, "Persistent", "Rockets.txt");
+            if (!System.IO.File.Exists(rocketsPath))
+            {
+                Logger.Info("Rockets.txt not found, no rockets to load", true);
+                return;
+            }
+            string json = System.IO.File.ReadAllText(rocketsPath).Trim();
+            if (json.Length < 2 || json[0] != '[')
+            {
+                Logger.Warning("Invalid Rockets.txt format, skipping rocket loading");
+                return;
+            }
+            foreach (string rocketJson in SplitJsonArray(json))
+            {
+                try
+                {
+                    rockets.InsertNew(ParseRocketJson(rocketJson));
+                }
+                catch (Exception ex)
+                {
+                    Logger.Warning($"Failed to parse a rocket: {ex.Message}");
+                }
+            }
+            Logger.Info($"Loaded {rockets.Count} rockets from {path}", true);
+        }
+
+        /// <summary>
+        /// 将JSON数组拆分为顶层元素字符串列表
+        /// </summary>
+        static List<string> SplitJsonArray(string json)
+        {
+            List<string> items = new List<string>();
+            string inner = json.Trim();
+            if (inner.Length >= 2 && inner[0] == '[')
+                inner = inner.Substring(1, inner.Length - 2);
+            int depth = 0;
+            bool inString = false;
+            int start = -1;
+            for (int i = 0; i < inner.Length; i++)
+            {
+                char c = inner[i];
+                if (inString)
+                {
+                    if (c == '\\') i++;
+                    else if (c == '"') inString = false;
+                }
+                else if (c == '"') inString = true;
+                else if (c == '{')
+                {
+                    if (depth == 0) start = i;
+                    depth++;
+                }
+                else if (c == '}')
+                {
+                    depth--;
+                    if (depth == 0 && start != -1)
+                    {
+                        items.Add(inner.Substring(start, i - start + 1));
+                        start = -1;
+                    }
+                }
+            }
+            return items;
+        }
+
+        /// <summary>
+        /// 将JSON对象拆分为键值对列表（值为原始字符串）
+        /// </summary>
+        static List<KeyValuePair<string, string>> ParseJsonObject(string json)
+        {
+            List<KeyValuePair<string, string>> result = new List<KeyValuePair<string, string>>();
+            string inner = json.Trim();
+            if (inner.Length >= 2 && inner[0] == '{')
+                inner = inner.Substring(1, inner.Length - 2);
+            int i = 0;
+            while (i < inner.Length)
+            {
+                while (i < inner.Length && char.IsWhiteSpace(inner[i])) i++;
+                if (i >= inner.Length) break;
+                if (inner[i] != '"') break;
+                i++;
+                string key = "";
+                while (i < inner.Length && inner[i] != '"')
+                {
+                    if (inner[i] == '\\' && i + 1 < inner.Length) { key += inner[i + 1]; i += 2; }
+                    else { key += inner[i]; i++; }
+                }
+                i++;
+                while (i < inner.Length && (char.IsWhiteSpace(inner[i]) || inner[i] == ':')) i++;
+                int start = i;
+                int depth = 0;
+                bool inStr = false;
+                while (i < inner.Length)
+                {
+                    char c = inner[i];
+                    if (inStr)
+                    {
+                        if (c == '\\') i++;
+                        else if (c == '"') inStr = false;
+                    }
+                    else
+                    {
+                        if (c == '"') inStr = true;
+                        else if (c == '{' || c == '[') depth++;
+                        else if (c == '}' || c == ']') depth--;
+                        else if (c == ',' && depth == 0) break;
+                    }
+                    i++;
+                }
+                result.Add(new KeyValuePair<string, string>(key, inner.Substring(start, i - start).Trim()));
+                if (i < inner.Length && inner[i] == ',') i++;
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// 解析单个火箭的JSON
+        /// </summary>
+        static RocketState ParseRocketJson(string json)
+        {
+            RocketState rocket = new RocketState();
+            foreach (var kvp in ParseJsonObject(json))
+            {
+                switch (kvp.Key)
+                {
+                    case "rocketName": rocket.rocketName = UnquoteString(kvp.Value); break;
+                    case "rotation": rocket.rotation = (float)ParseNumber(kvp.Value); break;
+                    case "angularVelocity": rocket.angularVelocity = (float)ParseNumber(kvp.Value); break;
+                    case "throttleOn": rocket.throttleOn = ParseBool(kvp.Value); break;
+                    case "throttlePercent": rocket.throttlePercent = (float)ParseNumber(kvp.Value); break;
+                    case "RCS": rocket.RCS = ParseBool(kvp.Value); break;
+                    case "location": rocket.location = ParseLocation(kvp.Value); break;
+                    case "parts": rocket.parts = ParseParts(kvp.Value); break;
+                    case "joints": rocket.joints = ParseJoints(kvp.Value); break;
+                    case "stages": rocket.stages = ParseStages(kvp.Value); break;
+                }
+            }
+            return rocket;
+        }
+
+        /// <summary>
+        /// 解析火箭位置
+        /// </summary>
+        static NetLocation ParseLocation(string json)
+        {
+            NetLocation loc = new NetLocation();
+            foreach (var kvp in ParseJsonObject(json))
+            {
+                if (kvp.Key == "position") loc.position = ParseDouble2(kvp.Value);
+                else if (kvp.Key == "velocity") loc.velocity = ParseDouble2(kvp.Value);
+                else if (kvp.Key == "address") loc.address = UnquoteString(kvp.Value);
+            }
+            return loc;
+        }
+
+        /// <summary>
+        /// 解析Double2（x, y）
+        /// </summary>
+        static Double2 ParseDouble2(string json)
+        {
+            Double2 v = new Double2();
+            foreach (var kvp in ParseJsonObject(json))
+            {
+                if (kvp.Key == "x") v.x = ParseNumber(kvp.Value);
+                else if (kvp.Key == "y") v.y = ParseNumber(kvp.Value);
+            }
+            return v;
+        }
+
+        /// <summary>
+        /// 解析部件列表
+        /// </summary>
+        static Dictionary<int, PartState> ParseParts(string json)
+        {
+            Dictionary<int, PartState> parts = new Dictionary<int, PartState>();
+            foreach (string partJson in SplitJsonArray(json))
+            {
+                int id = 0;
+                PartSave save = new PartSave();
+                foreach (var kvp in ParseJsonObject(partJson))
+                {
+                    switch (kvp.Key)
+                    {
+                        case "id": id = (int)ParseNumber(kvp.Value); break;
+                        case "name": save.name = UnquoteString(kvp.Value); break;
+                        case "position": save.position = ParseVector2(kvp.Value); break;
+                        case "orientation": save.orientation = ParseOrientation(kvp.Value); break;
+                        case "temperature": save.temperature = (float)ParseNumber(kvp.Value); break;
+                        case "NUMBER_VARIABLES": save.NUMBER_VARIABLES = ParseDoubleDict(kvp.Value); break;
+                        case "TOGGLE_VARIABLES": save.TOGGLE_VARIABLES = ParseBoolDict(kvp.Value); break;
+                        case "TEXT_VARIABLES": save.TEXT_VARIABLES = ParseStringDict(kvp.Value); break;
+                        case "burns": save.burns = ParseBurns(kvp.Value); break;
+                    }
+                }
+                parts.Add(id, new PartState() { part = save });
+            }
+            return parts;
+        }
+
+        /// <summary>
+        /// 解析Vector2（x, y）
+        /// </summary>
+        static Vector2 ParseVector2(string json)
+        {
+            Vector2 v = new Vector2();
+            foreach (var kvp in ParseJsonObject(json))
+            {
+                if (kvp.Key == "x") v.x = (float)ParseNumber(kvp.Value);
+                else if (kvp.Key == "y") v.y = (float)ParseNumber(kvp.Value);
+            }
+            return v;
+        }
+
+        /// <summary>
+        /// 解析朝向（x, y, z）
+        /// </summary>
+        static Orientation ParseOrientation(string json)
+        {
+            Orientation o = new Orientation();
+            foreach (var kvp in ParseJsonObject(json))
+            {
+                if (kvp.Key == "x") o.x = (float)ParseNumber(kvp.Value);
+                else if (kvp.Key == "y") o.y = (float)ParseNumber(kvp.Value);
+                else if (kvp.Key == "z") o.z = (float)ParseNumber(kvp.Value);
+            }
+            return o;
+        }
+
+        /// <summary>
+        /// 解析关节列表
+        /// </summary>
+        static List<JointState> ParseJoints(string json)
+        {
+            List<JointState> joints = new List<JointState>();
+            foreach (string jointJson in SplitJsonArray(json))
+            {
+                JointState joint = new JointState();
+                foreach (var kvp in ParseJsonObject(jointJson))
+                {
+                    if (kvp.Key == "partIndex_A") joint.id_A = (int)ParseNumber(kvp.Value);
+                    else if (kvp.Key == "partIndex_B") joint.id_B = (int)ParseNumber(kvp.Value);
+                }
+                joints.Add(joint);
+            }
+            return joints;
+        }
+
+        /// <summary>
+        /// 解析分级列表
+        /// </summary>
+        static List<StageState> ParseStages(string json)
+        {
+            List<StageState> stages = new List<StageState>();
+            foreach (string stageJson in SplitJsonArray(json))
+            {
+                StageState stage = new StageState();
+                foreach (var kvp in ParseJsonObject(stageJson))
+                {
+                    if (kvp.Key == "stageId") stage.stageID = (int)ParseNumber(kvp.Value);
+                    else if (kvp.Key == "partIndexes") stage.partIDs = ParseIntArray(kvp.Value);
+                }
+                stages.Add(stage);
+            }
+            return stages;
+        }
+
+        /// <summary>
+        /// 解析整数数组
+        /// </summary>
+        static List<int> ParseIntArray(string json)
+        {
+            List<int> result = new List<int>();
+            string inner = json.Trim();
+            if (inner.Length >= 2 && inner[0] == '[')
+                inner = inner.Substring(1, inner.Length - 2);
+            foreach (string item in inner.Split(','))
+            {
+                if (int.TryParse(item.Trim(), out int value))
+                    result.Add(value);
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// 解析数字字典
+        /// </summary>
+        static Dictionary<string, double> ParseDoubleDict(string json)
+        {
+            Dictionary<string, double> dict = new Dictionary<string, double>();
+            foreach (var kvp in ParseJsonObject(json))
+                dict[kvp.Key] = ParseNumber(kvp.Value);
+            return dict;
+        }
+
+        /// <summary>
+        /// 解析布尔字典
+        /// </summary>
+        static Dictionary<string, bool> ParseBoolDict(string json)
+        {
+            Dictionary<string, bool> dict = new Dictionary<string, bool>();
+            foreach (var kvp in ParseJsonObject(json))
+                dict[kvp.Key] = ParseBool(kvp.Value);
+            return dict;
+        }
+
+        /// <summary>
+        /// 解析字符串字典
+        /// </summary>
+        static Dictionary<string, string> ParseStringDict(string json)
+        {
+            Dictionary<string, string> dict = new Dictionary<string, string>();
+            foreach (var kvp in ParseJsonObject(json))
+                dict[kvp.Key] = UnquoteString(kvp.Value);
+            return dict;
+        }
+
+        /// <summary>
+        /// 解析烧灼痕迹，空对象表示无
+        /// </summary>
+        static BurnMark.BurnSave ParseBurns(string json)
+        {
+            string trimmed = json.Trim();
+            if (trimmed == "{}") return null;
+            BurnMark.BurnSave burns = new BurnMark.BurnSave();
+            foreach (var kvp in ParseJsonObject(trimmed))
+            {
+                if (kvp.Key == "angle") burns.angle = (float)ParseNumber(kvp.Value);
+                else if (kvp.Key == "intensity") burns.intensity = (float)ParseNumber(kvp.Value);
+                else if (kvp.Key == "x") burns.x = (float)ParseNumber(kvp.Value);
+                else if (kvp.Key == "top") burns.top = UnquoteString(kvp.Value);
+                else if (kvp.Key == "bottom") burns.bottom = UnquoteString(kvp.Value);
+            }
+            return burns;
+        }
+
+        /// <summary>
+        /// 解析数字
+        /// </summary>
+        static double ParseNumber(string value)
+        {
+            return double.TryParse(value.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out double result) ? result : 0;
+        }
+
+        /// <summary>
+        /// 解析布尔值
+        /// </summary>
+        static bool ParseBool(string value)
+        {
+            return value.Trim().Equals("true", StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// 去掉字符串值的引号并反转义
+        /// </summary>
+        static string UnquoteString(string value)
+        {
+            value = value.Trim();
+            if (value.Length >= 2 && value[0] == '"' && value[value.Length - 1] == '"')
+                value = value.Substring(1, value.Length - 2);
+            return value.Replace("\\\"", "\"").Replace("\\\\", "\\");
         }
         
         private double ExtractWorldTimeFromJson(string json)

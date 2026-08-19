@@ -1,8 +1,10 @@
 using System;
+using System.IO;
 using System.Net;
 using System.Threading;
 using System.Reflection;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 using UnityEngine;
 using Lidgren.Network;
 using SFS;
@@ -75,7 +77,8 @@ namespace MultiplayerSFS.Mod
                 new Packet_JoinRequest()
                 {
                     Username = info.username,
-                    Password = info.password,
+                    // 发送密码哈希
+                    Password = Packet_JoinRequest.GetPasswordHash(info.password),
                     SolarSystemName = solarSystemName,
                     GameVersion = gameVersion
                 }
@@ -83,7 +86,7 @@ namespace MultiplayerSFS.Mod
             client.Connect(new IPEndPoint(info.address, info.port), hail);
 
             Menu.loading.Open("Waiting for server response...");
-            string denialReason = "Unable to connect to server...";
+            string denialReason = "Connection timed out";
             while (true)
             {
                 NetIncomingMessage msg;
@@ -109,10 +112,16 @@ namespace MultiplayerSFS.Mod
                         break;
                     case NetIncomingMessageType.StatusChanged:
                         NetConnectionStatus status = (NetConnectionStatus) msg.ReadByte();
+                        string reason = msg.ReadString();
                         if (status == NetConnectionStatus.Connected)
                             goto ConnectionApproved;
                         else if (status == NetConnectionStatus.Disconnected)
+                        {
+                            // 读取断开/拒绝原因
+                            if (!string.IsNullOrWhiteSpace(reason))
+                                denialReason = $"Unable to connect to server: {reason}";
                             goto ConnectionDenied;
+                        }
                         break;
                     default:
                         Debug.LogWarning($"Recieved unhandled message type ({msg.MessageType}) when attempting to connect to server.");
@@ -132,13 +141,222 @@ namespace MultiplayerSFS.Mod
                 return;
         }
 
+        /// <summary>
+        /// 局域网内发现的服务器信息
+        /// </summary>
+        public class ServerInfo
+        {
+            public IPEndPoint endpoint;
+            public string name;
+            public int playerCount;
+            public int maxPlayers;
+            public string allowedVersions;
+            public bool hasPassword;
+            /// <summary>
+            /// 是否为历史加入记录
+            /// </summary>
+            public bool isHistory;
+            /// <summary>
+            /// 上次向该服务器询问信息的时间
+            /// </summary>
+            public float lastQueried;
+        }
+
+        /// <summary>
+        /// 历史服务器的本地持久化数据
+        /// </summary>
+        [Serializable]
+        public class HistoryServer
+        {
+            public string address;
+            public int port;
+            public string name;
+        }
+
+        [Serializable]
+        public class HistoryServerList
+        {
+            public List<HistoryServer> list = new List<HistoryServer>();
+        }
+
+        /// <summary>
+        /// 加入过的服务器列表
+        /// </summary>
+        public static List<ServerInfo> serverHistory = new List<ServerInfo>();
+
+        /// <summary>
+        /// 历史服务器文件的保存路径
+        /// </summary>
+        static string GetHistoryFilePath()
+        {
+            return Path.Combine(Main.historyPersistentFolder.ToString(), "ServerHistory.json");
+        }
+
+        public static void LoadServerHistory()
+        {
+            serverHistory.Clear();
+            try
+            {
+                string path = GetHistoryFilePath();
+                if (!File.Exists(path))
+                    return;
+                HistoryServerList data = JsonUtility.FromJson<HistoryServerList>(File.ReadAllText(path));
+                if (data == null)
+                    return;
+                foreach (HistoryServer entry in data.list)
+                {
+                    if (IPAddress.TryParse(entry.address, out IPAddress address))
+                    {
+                        serverHistory.Add(new ServerInfo()
+                        {
+                            endpoint = new IPEndPoint(address, entry.port),
+                            name = entry.name,
+                            isHistory = true,
+                        });
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"Failed to load server history: {e.Message}");
+            }
+        }
+
+        public static void SaveServerHistory()
+        {
+            HistoryServerList data = new HistoryServerList();
+            foreach (ServerInfo server in serverHistory)
+            {
+                data.list.Add(new HistoryServer()
+                {
+                    address = server.endpoint.Address.ToString(),
+                    port = server.endpoint.Port,
+                    name = server.name,
+                });
+            }
+            try
+            {
+                Directory.CreateDirectory(Main.historyPersistentFolder.ToString());
+                File.WriteAllText(GetHistoryFilePath(), JsonUtility.ToJson(data));
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"Failed to save server history: {e.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 记录加入过的服务器
+        /// </summary>
+        public static void AddToServerHistory(IPEndPoint endpoint, string name)
+        {
+            foreach (ServerInfo server in serverHistory)
+            {
+                if (server.endpoint.Equals(endpoint))
+                {
+                    server.name = name;
+                    SaveServerHistory();
+                    return;
+                }
+            }
+            serverHistory.Add(new ServerInfo()
+            {
+                endpoint = endpoint,
+                name = name,
+                isHistory = true,
+            });
+            SaveServerHistory();
+        }
+
+        public static void RemoveFromServerHistory(ServerInfo server)
+        {
+            serverHistory.Remove(server);
+            SaveServerHistory();
+        }
+
+        /// <summary>
+        /// 通过UDP广播扫描局域网内的服务器
+        /// </summary>
+        public static async Task<List<ServerInfo>> DiscoverLAN(int port)
+        {
+            NetPeerConfiguration npc = new NetPeerConfiguration("multiplayersfs");
+            npc.EnableMessageType(NetIncomingMessageType.DiscoveryResponse);
+            NetClient discoveryClient = new NetClient(npc);
+            discoveryClient.Start();
+            for (int p = port; p < port + 10; p++)
+                discoveryClient.DiscoverLocalPeers(p);
+
+            List<ServerInfo> servers = new List<ServerInfo>();
+            DateTime endTime = DateTime.Now.AddSeconds(2);
+            while (DateTime.Now < endTime)
+            {
+                NetIncomingMessage msg;
+                while ((msg = discoveryClient.ReadMessage()) != null)
+                {
+                    if (msg.MessageType == NetIncomingMessageType.DiscoveryResponse)
+                    {
+                        servers.Add(new ServerInfo()
+                        {
+                            endpoint = msg.SenderEndPoint,
+                            name = msg.ReadString(),
+                            playerCount = msg.ReadInt32(),
+                            maxPlayers = msg.ReadInt32(),
+                            allowedVersions = msg.ReadString(),
+                            hasPassword = msg.ReadBoolean(),
+                        });
+                    }
+                }
+                await Task.Delay(50);
+            }
+            discoveryClient.Shutdown("Discovery complete");
+            return servers;
+        }
+
+        /// <summary>
+        /// 向指定服务器发送发现请求并获取信息，无响应返回null
+        /// </summary>
+        public static async Task<ServerInfo> GetServerInfo(IPEndPoint endpoint)
+        {
+            NetPeerConfiguration npc = new NetPeerConfiguration("multiplayersfs");
+            npc.EnableMessageType(NetIncomingMessageType.DiscoveryResponse);
+            NetClient infoClient = new NetClient(npc);
+            infoClient.Start();
+            infoClient.DiscoverKnownPeer(endpoint);
+
+            DateTime endTime = DateTime.Now.AddSeconds(2);
+            while (DateTime.Now < endTime)
+            {
+                NetIncomingMessage msg;
+                while ((msg = infoClient.ReadMessage()) != null)
+                {
+                    if (msg.MessageType == NetIncomingMessageType.DiscoveryResponse && msg.SenderEndPoint.Equals(endpoint))
+                    {
+                        ServerInfo info = new ServerInfo()
+                        {
+                            endpoint = msg.SenderEndPoint,
+                            name = msg.ReadString(),
+                            playerCount = msg.ReadInt32(),
+                            maxPlayers = msg.ReadInt32(),
+                            allowedVersions = msg.ReadString(),
+                            hasPassword = msg.ReadBoolean(),
+                        };
+                        infoClient.Shutdown("Query complete");
+                        return info;
+                    }
+                }
+                await Task.Delay(50);
+            }
+            infoClient.Shutdown("Query timeout");
+            return null;
+        }
+
         public static void LoadWorld()
         {
             Menu.loading.Open("Loading multiplayer world...");
             
             Packet_JoinResponse response = client.ServerConnection.RemoteHailMessage.Read<Packet_JoinResponse>();
             playerId = response.PlayerId;
-            
+            AddToServerHistory(client.ServerConnection.RemoteEndPoint, response.ServerName);
             LocalManager.updateRocketsPeriod = response.UpdateRocketsPeriod;
             LocalManager.Initialize();
 

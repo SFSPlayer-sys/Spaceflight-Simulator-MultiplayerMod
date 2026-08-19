@@ -2,6 +2,7 @@ using System;
 using System.Text;
 using System.Reflection;
 using System.Globalization;
+using System.Collections.Generic;
 
 namespace MultiplayerSFS.Server
 {
@@ -24,9 +25,19 @@ namespace MultiplayerSFS.Server
 		public string worldSavePath = "./World";
 
 		[ServerConfigVariable(
-			"Port used by the server. Generally should not be changed, as this is also the default port for the client's join menu."
+			"Port used by the server. Generally should not be changed, as this is also the default port for the client's join menu. If the port is unavailable, the server will try the next port (port+1) and so on."
 		)]
 		public int port = 9806;
+
+		[ServerConfigVariable(
+			"The name of this server, shown in the server list."
+		)]
+		public string serverName = "Multiplayer SFS Server";
+
+		[ServerConfigVariable(
+			"Whether this server responds to LAN discovery requests and appears in the server list."
+		)]
+		public bool discoveryEnabled = true;
 
 		[ServerConfigVariable(
 			"Password required by players to access the multiplayer server.",
@@ -91,12 +102,6 @@ namespace MultiplayerSFS.Server
 		public double loadRange = 7500;
 
 		[ServerConfigVariable(
-			"Authority update interval in milliseconds. Lower values increase CPU usage.",
-			"Do not adjust unless you know what you are doing."
-		)]
-		public int authorityUpdateInterval = 200;
-
-		[ServerConfigVariable(
 			"Maximum time warp scale allowed on the server. Set to 0 for unlimited.",
 			"Do not adjust unless you know what you are doing."
 		)]
@@ -107,49 +112,6 @@ namespace MultiplayerSFS.Server
 			"Do not adjust unless you know what you are doing."
 		)]
 		public int timeWarpVoteTimeout = 30;
-
-		[ServerConfigVariable(
-			"Network timeout in seconds for client connections.",
-			"Do not adjust unless you know what you are doing."
-		)]
-		public int networkTimeout = 15;
-
-		[ServerConfigVariable(
-			"Maximum packet size in bytes.",
-			"Do not adjust unless you know what you are doing."
-		)]
-		public int maxPacketSize = 65536;
-
-		[ServerConfigVariable(
-			"Enable network compression to reduce bandwidth.",
-			"Do not adjust unless you know what you are doing."
-		)]
-		public bool enableNetworkCompression = false;
-
-		[ServerConfigVariable(
-			"Server tick rate in milliseconds. Minimum is 1ms.",
-			"Do not adjust unless you know what you are doing."
-		)]
-		public int serverTickRate = 1;
-
-		[ServerConfigVariable(
-			"Enable Server GC mode for better performance on multi-core systems.",
-			"Uses more memory but reduces GC pause times.",
-			"Do not adjust unless you know what you are doing."
-		)]
-		public bool enableServerGC = true;
-
-		[ServerConfigVariable(
-			"Enable concurrent garbage collection to reduce pause times.",
-			"Do not adjust unless you know what you are doing."
-		)]
-		public bool gcConcurrent = true;
-
-		[ServerConfigVariable(
-			"Number of GC heaps. 0 = auto (usually equals CPU core count).",
-			"Do not adjust unless you know what you are doing."
-		)]
-		public int gcHeapCount = 0;
 
 		[ServerConfigVariable(
 			"World auto-save interval in seconds."
@@ -190,6 +152,7 @@ namespace MultiplayerSFS.Server
 			try
 			{
 				var result = new ServerSettings();
+				HashSet<string> keys = new HashSet<string>();
 
 				string[] lines = input.Split('\n');
 				
@@ -210,13 +173,23 @@ namespace MultiplayerSFS.Server
 					try
 					{
                         FieldInfo field = result.GetType().GetField(key);
+                        if (field == null) continue; // 跳过旧配置中的无效项
 						field.SetValue(result, Convert.ChangeType(value, field.FieldType, CultureInfo.InvariantCulture));
+						keys.Add(key);
 						Logger.Info(key + ": " + field.GetValue(result));
 					}
 					catch (Exception ex)
 					{
 						throw new Exception($"Variable deserialization error ({key})", ex);
 					}
+				}
+
+				// 输出配置文件中不存在的字段
+				foreach (var field in result.GetType().GetFields())
+				{
+					if (field.GetCustomAttribute<ServerConfigVariable>() == null) continue;
+					if (keys.Contains(field.Name)) continue;
+					Logger.Info(field.Name + ": " + field.GetValue(result));
 				}
 				
 				return result;

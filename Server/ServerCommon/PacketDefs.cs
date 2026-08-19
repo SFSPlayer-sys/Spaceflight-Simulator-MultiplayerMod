@@ -64,6 +64,21 @@ namespace MultiplayerSFS.ServerCommon
         public string SolarSystemName { get; set; } = "";
         public string GameVersion { get; set; } = "";
 
+        /// <summary>
+        /// 计算密码的 SHA256 哈希
+        /// </summary>
+        public static string GetPasswordHash(string password)
+        {
+            using (System.Security.Cryptography.SHA256 sha = System.Security.Cryptography.SHA256.Create())
+            {
+                byte[] hash = sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(password));
+                System.Text.StringBuilder sb = new System.Text.StringBuilder();
+                foreach (byte b in hash)
+                    sb.Append(b.ToString("x2"));
+                return sb.ToString();
+            }
+        }
+
         public override PacketType Type => PacketType.JoinRequest;
         public override void Serialize(NetOutgoingMessage msg)
         {
@@ -90,6 +105,7 @@ namespace MultiplayerSFS.ServerCommon
         public double SendTime { get; set; }
         public int Difficulty { get; set; }
         public string SolarSystemName { get; set; } = "";
+        public string ServerName { get; set; } = "";
 
         public override PacketType Type => PacketType.JoinResponse;
         public override void Serialize(NetOutgoingMessage msg)
@@ -101,6 +117,7 @@ namespace MultiplayerSFS.ServerCommon
             msg.Write(SendTime);
             msg.Write((byte)Difficulty);
             msg.Write(SolarSystemName);
+            msg.Write(ServerName);
         }
 
         public override void Deserialize(NetIncomingMessage msg)
@@ -112,6 +129,7 @@ namespace MultiplayerSFS.ServerCommon
             SendTime = msg.ReadDouble();
             Difficulty = msg.ReadByte();
             SolarSystemName = msg.ReadString();
+            ServerName = msg.ReadString();
         }
     }
 

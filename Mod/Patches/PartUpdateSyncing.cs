@@ -79,7 +79,7 @@ namespace MultiplayerSFS.Mod.Patches
                 LocalRocket local_a = LocalManager.syncedRockets[id_a];
                 LocalRocket local_b = LocalManager.syncedRockets[id_b];
 
-                // 更新 local_b 的部件列表以反映合并后的状态（包含A和B的所有部件）
+                // 更新 local_b 的部件列表
                 local_b.parts.Clear();
                 foreach (Part part in rocket_B.partHolder.partsSet)
                 {
@@ -100,7 +100,7 @@ namespace MultiplayerSFS.Mod.Patches
                     );
                 }
 
-                // 对接后重新同步所有火箭状态
+                // 重新同步所有火箭状态
                 foreach (KeyValuePair<int, LocalRocket> kvp in LocalManager.syncedRockets)
                 {
                     ClientManager.SendPacket
@@ -117,7 +117,7 @@ namespace MultiplayerSFS.Mod.Patches
         }
 
         /// <summary>
-        /// 同步引擎模块的开关状态，只有HOST或控制者能发送
+        /// 同步引擎模块的开关状态
         /// </summary>
         [HarmonyPatch(typeof(EngineModule), "Start")]
         public class EngineModule_Start
@@ -168,7 +168,7 @@ namespace MultiplayerSFS.Mod.Patches
         }
 
         /// <summary>
-        /// 同步助推器模块的状态，只有HOST或控制者能发送
+        /// 同步助推器模块的状态
         /// </summary>
         [HarmonyPatch]
         public class BoosterModuleUpdates
@@ -228,7 +228,7 @@ namespace MultiplayerSFS.Mod.Patches
         }
 
         /// <summary>
-        /// 同步轮子模块的开关，只有HOST或控制者能发送
+        /// 同步轮子模块的开关
         /// </summary>
         [HarmonyPatch(typeof(WheelModule), nameof(WheelModule.ToggleEnabled))]
         public static class WheelModule_ToggleEnabled
@@ -271,7 +271,7 @@ namespace MultiplayerSFS.Mod.Patches
         }
 
         /// <summary>
-        /// 同步降落伞模块的状态，只有HOST或控制者能发送
+        /// 同步降落伞模块的状态
         /// </summary>
         [HarmonyPatch(typeof(ParachuteModule), "Start")]
         public class ParachuteModule_Start
@@ -320,7 +320,7 @@ namespace MultiplayerSFS.Mod.Patches
         }
 
         /// <summary>
-        /// 同步移动模块（起落架、太阳能板等），只有HOST或控制者能发送
+        /// 同步移动模块
         /// </summary>
         [HarmonyPatch(typeof(MoveModule), nameof(MoveModule.Toggle))]
         public static class MoveModule_Toggle

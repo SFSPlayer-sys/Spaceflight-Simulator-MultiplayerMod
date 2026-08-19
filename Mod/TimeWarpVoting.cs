@@ -39,7 +39,7 @@ namespace MultiplayerSFS.Mod
                 return;
             }
             
-            // 已经在时间加速中，停止当前加速
+            // 停止当前加速
             if (IsTimeWarping)
             {
                 StopTimeWarp();
@@ -221,7 +221,7 @@ namespace MultiplayerSFS.Mod
         }
         
         /// <summary>
-        /// 收到服务器的投票请求
+        /// 收到投票请求
         /// </summary>
         public static void OnVoteRequestReceived(Packet_TimeWarpVote packet)
         {
@@ -439,7 +439,7 @@ namespace MultiplayerSFS.Mod
         }
         
         /// <summary>
-        /// 重置状态（断开连接时调用）
+        /// 重置状态
         /// </summary>
         public static void Reset()
         {
@@ -451,7 +451,7 @@ namespace MultiplayerSFS.Mod
             
             CloseVoteWindow();
             
-            // 使用SetState方法重置时间
+            // 重置时间
             if (WorldTime.main != null)
             {
                 WorldTime.main.SetState(1f, false, false);
@@ -459,7 +459,7 @@ namespace MultiplayerSFS.Mod
         }
 
         /// <summary>
-        /// 同步当前时间加速状态（发射火箭后调用）
+        /// 同步当前时间加速状态
         /// </summary>
         public static void SyncCurrentTimeWarp()
         {

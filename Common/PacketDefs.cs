@@ -154,6 +154,21 @@ namespace MultiplayerSFS.Common
         public string SolarSystemName { get; set; } = "";
         public string GameVersion { get; set; } = "";
 
+        /// <summary>
+        /// 计算密码的 SHA256 哈希
+        /// </summary>
+        public static string GetPasswordHash(string password)
+        {
+            using (System.Security.Cryptography.SHA256 sha = System.Security.Cryptography.SHA256.Create())
+            {
+                byte[] hash = sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(password));
+                System.Text.StringBuilder sb = new System.Text.StringBuilder();
+                foreach (byte b in hash)
+                    sb.Append(b.ToString("x2"));
+                return sb.ToString();
+            }
+        }
+
         public override PacketType Type => PacketType.JoinRequest;
         public override void Serialize(NetOutgoingMessage msg)
         {
@@ -179,6 +194,7 @@ namespace MultiplayerSFS.Common
         public double SendTime { get; set; }
         public SFS.WorldBase.Difficulty.DifficultyType Difficulty { get; set; }
         public string SolarSystemName { get; set; } = "";
+        public string ServerName { get; set; } = "";
 
         public override PacketType Type => PacketType.JoinResponse;
         public override void Serialize(NetOutgoingMessage msg)
@@ -190,6 +206,7 @@ namespace MultiplayerSFS.Common
             msg.Write(SendTime);
             msg.Write((byte) Difficulty);
             msg.Write(SolarSystemName);
+            msg.Write(ServerName);
         }
 
         public override void Deserialize(NetIncomingMessage msg)
@@ -201,6 +218,7 @@ namespace MultiplayerSFS.Common
             SendTime = msg.ReadDouble();
             Difficulty = (SFS.WorldBase.Difficulty.DifficultyType) msg.ReadByte();
             SolarSystemName = msg.ReadString();
+            ServerName = msg.ReadString();
         }
     }
     public class Packet_PlayerConnected : Packet
@@ -769,7 +787,7 @@ namespace MultiplayerSFS.Common
         public float TimeScale { get; set; }
         public bool PhysicsWarp { get; set; }
         public string StopperName { get; set; } = "";
-        // 拒绝者名字（投票被拒绝时通知请求者）
+        // 拒绝者名字
         public string RejecterName { get; set; } = "";
 
         public override PacketType Type => PacketType.TimeWarpResult;

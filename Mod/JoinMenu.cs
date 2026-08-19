@@ -2,6 +2,7 @@ using System;
 using System.Net;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 using UnityEngine;
 using SFS.UI;
 using SFS.Input;
@@ -60,6 +61,8 @@ namespace MultiplayerSFS.Mod
                     titleText: "Multiplayer SFS - Join Menu"
                 );
                 CreateUI();
+                ClientManager.LoadServerHistory();
+                ScanLAN();
             }
 
         }
@@ -68,6 +71,8 @@ namespace MultiplayerSFS.Mod
         {
             if (ScreenManager.main.CurrentScreen == this && windowHolder != null)
             {
+                serverListActive = false;
+                DestroyServerList();
                 ClientManager.multiplayerEnabled.Value = false;
                 ScreenManager.main.CloseCurrent();
                 windowHolder.SetActive(false);
@@ -142,6 +147,219 @@ namespace MultiplayerSFS.Mod
             backJoinButtons.CreateLayoutGroup(Type.Horizontal, childAlignment: TextAnchor.MiddleLeft);
             Builder.CreateButton(backJoinButtons, 300, 100, text: "Back", onClick: Close);
             Builder.CreateButton(backJoinButtons, 300, 100, text: "Join", onClick: CheckAndJoin);
+        }
+
+        /// <summary>
+        /// 服务器列表窗口与扫描状态
+        /// </summary>
+        static GameObject serverListHolder;
+        static Window serverListWindow;
+        static Window serverListRows;
+        static bool serverListActive = false;
+        static bool serverListCreated = false;
+        /// <summary>
+        /// 上一次扫描到的服务器
+        /// </summary>
+        static List<ClientManager.ServerInfo> lastScannedServers = new List<ClientManager.ServerInfo>();
+
+        /// <summary>
+        /// 扫描局域网内服务器并周期性刷新列表
+        /// </summary>
+        async void ScanLAN()
+        {
+            if (serverListActive) return;
+            serverListActive = true;
+            try
+            {
+                ShowServerList(new List<ClientManager.ServerInfo>());
+                serverListCreated = true;
+                while (serverListActive)
+                {
+                    List<ClientManager.ServerInfo> servers = await ClientManager.DiscoverLAN(joinInfo.port);
+                    if (!serverListActive) break;
+                    if (serverListCreated && serverListHolder == null)
+                        break;
+                    ShowServerList(servers);
+                    await Task.Delay(2000);
+                }
+            }
+            catch (Exception e)
+            {
+                MsgDrawer.main.Log("An error occured... (Check console)");
+                Debug.LogError(e);
+            }
+            finally
+            {
+                serverListActive = false;
+            }
+        }
+
+        /// <summary>
+        /// 销毁服务器列表窗口
+        /// </summary>
+        static void DestroyServerList()
+        {
+            if (serverListHolder != null)
+                UnityEngine.Object.Destroy(serverListHolder);
+            serverListHolder = null;
+            serverListWindow = null;
+            serverListRows = null;
+            serverListCreated = false;
+        }
+
+        /// <summary>
+        /// 显示服务器列表（历史 + 扫描），窗口只建一次，仅更新数据行
+        /// </summary>
+        static void ShowServerList(List<ClientManager.ServerInfo> servers)
+        {
+            lastScannedServers = servers;
+
+            // 首次创建窗口与表头
+            if (serverListHolder == null)
+            {
+                serverListHolder = Builder.CreateHolder(Builder.SceneToAttach.CurrentScene, "MultiplayerSFS - Server List");
+                serverListWindow = Builder.CreateWindow
+                (
+                    serverListHolder.transform,
+                    Builder.GetRandomID(),
+                    950,
+                    500,
+                    0,
+                    0,
+                    true,
+                    true,
+                    0.95f,
+                    "Servers"
+                );
+                serverListWindow.CreateLayoutGroup(Type.Vertical, TextAnchor.UpperLeft, spacing: 3f, padding: new RectOffset(5, 5, 5, 5));
+                serverListRows = Builder.CreateWindow
+                (
+                    serverListWindow,
+                    Builder.GetRandomID(),
+                    930,
+                    400,
+                    savePosition: false
+                );
+                serverListRows.CreateLayoutGroup(Type.Vertical, TextAnchor.UpperLeft, spacing: 3f, padding: new RectOffset(5, 5, 5, 5));
+                serverListRows.EnableScrolling(Type.Vertical);
+
+                // 表头放在行窗口内，与数据行共享同一布局容器
+                Container header = Builder.CreateContainer(serverListRows);
+                header.CreateLayoutGroup(Type.Horizontal, TextAnchor.MiddleLeft, spacing: 3f);
+                CreateColumnLabel(header, 160, "IP Address");
+                CreateColumnLabel(header, 200, "Name");
+                CreateColumnLabel(header, 70, "Players");
+                CreateColumnLabel(header, 150, "Version");
+                CreateColumnLabel(header, 80, "Password");
+                Builder.CreateLabel(header, 90, 24, text: "");
+                Builder.CreateLabel(header, 60, 24, text: "");
+            }
+
+            // 清空旧行（保留第一个子对象：表头）
+            while (serverListRows.ChildrenHolder.transform.childCount > 1)
+                UnityEngine.Object.DestroyImmediate(serverListRows.ChildrenHolder.transform.GetChild(1).gameObject);
+
+            // 合并历史记录与扫描结果
+            List<ClientManager.ServerInfo> history = new List<ClientManager.ServerInfo>(ClientManager.serverHistory);
+            List<ClientManager.ServerInfo> all = new List<ClientManager.ServerInfo>();
+            foreach (ClientManager.ServerInfo scanned in servers)
+            {
+                ClientManager.ServerInfo hit = history.Find(h => h.endpoint.Equals(scanned.endpoint));
+                if (hit != null)
+                {
+                    hit.playerCount = scanned.playerCount;
+                    hit.maxPlayers = scanned.maxPlayers;
+                    hit.allowedVersions = scanned.allowedVersions;
+                    hit.hasPassword = scanned.hasPassword;
+                    history.Remove(hit);
+                }
+                else
+                {
+                    all.Add(scanned);
+                }
+            }
+            all.InsertRange(0, history);
+            foreach (ClientManager.ServerInfo offline in history)
+                QueryHistoryServer(offline);
+
+            // 填充新行
+            foreach (ClientManager.ServerInfo server in all)
+            {
+                Container row = Builder.CreateContainer(serverListRows);
+                row.CreateLayoutGroup(Type.Horizontal, TextAnchor.MiddleLeft, spacing: 3f);
+                CreateColumnLabel(row, 160, server.endpoint.Address.ToString());
+                CreateColumnLabel(row, 200, server.name);
+                if (server.isHistory)
+                {
+                    CreateColumnLabel(row, 70, server.maxPlayers > 0 ? $"{server.playerCount}/{server.maxPlayers}" : "-");
+                    CreateColumnLabel(row, 150, string.IsNullOrWhiteSpace(server.allowedVersions) ? "-" : server.allowedVersions);
+                    CreateColumnLabel(row, 80, server.hasPassword ? "Yes" : "-");
+                }
+                else
+                {
+                    CreateColumnLabel(row, 70, $"{server.playerCount}/{server.maxPlayers}");
+                    CreateColumnLabel(row, 150, string.IsNullOrWhiteSpace(server.allowedVersions) ? "All" : server.allowedVersions);
+                    CreateColumnLabel(row, 80, server.hasPassword ? "Yes" : "No");
+                }
+                Builder.CreateButton(row, 90, 24, 0, 0, () => SelectServer(server.endpoint), "Join");
+                if (server.isHistory)
+                {
+                    ClientManager.ServerInfo captured = server;
+                    Builder.CreateButton(row, 60, 24, 0, 0,
+                        () =>
+                        {
+                            ClientManager.RemoveFromServerHistory(captured);
+                            ShowServerList(lastScannedServers);
+                        },
+                        "X");
+                }
+                else
+                {
+                    // 用空标签占位
+                    Builder.CreateLabel(row, 60, 24, text: "");
+                }
+            }
+        }
+
+        /// <summary>
+        /// 向历史服务器定向询问信息并更新显示
+        /// </summary>
+        static async void QueryHistoryServer(ClientManager.ServerInfo server)
+        {
+            if (Time.unscaledTime - server.lastQueried < 5f)
+                return;
+            server.lastQueried = Time.unscaledTime;
+            ClientManager.ServerInfo info = await ClientManager.GetServerInfo(server.endpoint);
+            // 菜单已关闭或无响应时不做处理
+            if (info == null || serverListHolder == null)
+                return;
+            server.name = string.IsNullOrWhiteSpace(info.name) ? server.name : info.name;
+            server.playerCount = info.playerCount;
+            server.maxPlayers = info.maxPlayers;
+            server.allowedVersions = info.allowedVersions;
+            server.hasPassword = info.hasPassword;
+            ShowServerList(lastScannedServers);
+        }
+
+        /// <summary>
+        /// 创建表格列标签
+        /// </summary>
+        static void CreateColumnLabel(Container parent, int width, string text)
+        {
+            Builder.CreateLabel(parent, width, 24, text: text).TextAlignment = TMPro.TextAlignmentOptions.MidlineLeft;
+        }
+
+        /// <summary>
+        /// 选择服务器并填充连接信息
+        /// </summary>
+        static void SelectServer(IPEndPoint endpoint)
+        {
+            serverListActive = false;
+            main.joinInfo.address = endpoint.Address;
+            main.joinInfo.port = endpoint.Port;
+            main.input_address.Text = endpoint.Address.ToString();
+            main.input_port.Text = endpoint.Port.ToString();
+            DestroyServerList();
         }
 
         async void CheckAndJoin()

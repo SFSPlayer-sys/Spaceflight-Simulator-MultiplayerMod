@@ -182,7 +182,7 @@ namespace MultiplayerSFS.Mod
                     break;
                     
                 case InterpolationMode.Spherical:
-                    // * 球面插值（用于在星球表面移动）
+                    // * 球面插值
                     SphericalInterpolation(prev, next, t, out loc, out rot, out angVel);
                     break;
                     
@@ -231,7 +231,7 @@ namespace MultiplayerSFS.Mod
             angVel = Mathf.Lerp(prev.AngularVelocity, next.AngularVelocity, (float) t);
         }
 
-        // 球面插值（用于在星球表面移动）
+        // 球面插值
         void SphericalInterpolation(Packet_UpdateRocketPrimary prev, Packet_UpdateRocketPrimary next, double t, out Location loc, out float rot, out float angVel)
         {
             loc = prev.Location.ToVanillaLocation();
