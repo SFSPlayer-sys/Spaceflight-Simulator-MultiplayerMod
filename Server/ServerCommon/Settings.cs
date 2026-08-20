@@ -21,10 +21,11 @@ namespace MultiplayerSFS.ServerCommon
         public int timeWarpVoteTimeout = 30;
         public string motd = "";
         public string motdColor = "0000FFFF";
+        public bool allowLaunchOnOccupiedPad = false;
+        public string planetsPackPath = "";
 
         public string Serialize()
         {
-            // Simple serialization for now
             return $"port={port}\n"
                  + $"serverName={serverName}\n"
                  + $"serverPassword={serverPassword}\n"
@@ -39,7 +40,9 @@ namespace MultiplayerSFS.ServerCommon
                  + $"timeWarpMaxScale={timeWarpMaxScale}\n"
                  + $"timeWarpVoteTimeout={timeWarpVoteTimeout}\n"
                  + $"motd={motd}\n"
-                 + $"motdColor={motdColor}";
+                 + $"motdColor={motdColor}\n"
+                 + $"allowLaunchOnOccupiedPad={allowLaunchOnOccupiedPad}\n"
+                 + $"planetsPackPath={planetsPackPath}";
         }
 
         public static ServerSettings Deserialize(string data)
@@ -110,6 +113,13 @@ namespace MultiplayerSFS.ServerCommon
                         break;
                     case "motdColor":
                         settings.motdColor = value;
+                        break;
+                    case "allowLaunchOnOccupiedPad":
+                        if (bool.TryParse(value, out bool allowLaunchValue))
+                            settings.allowLaunchOnOccupiedPad = allowLaunchValue;
+                        break;
+                    case "planetsPackPath":
+                        settings.planetsPackPath = value;
                         break;
                 }
             }

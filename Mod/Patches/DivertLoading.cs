@@ -124,7 +124,7 @@ namespace MultiplayerSFS.Mod.Patches
 
             public static bool Prefix(bool forceVertical)
             {
-                if (ClientManager.multiplayerEnabled && BuildManager.main.buildGrid.activeGrid.partsHolder.parts.Count > 0)
+                if (ClientManager.multiplayerEnabled && !ClientManager.allowLaunchOnOccupiedPad && BuildManager.main.buildGrid.activeGrid.partsHolder.parts.Count > 0)
                 {
                     ReplacementMethod(forceVertical);
                     return false;

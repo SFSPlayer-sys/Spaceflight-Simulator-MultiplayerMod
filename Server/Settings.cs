@@ -118,6 +118,17 @@ namespace MultiplayerSFS.Server
 		)]
 		public int worldSaveInterval = 300;
 
+		[ServerConfigVariable(
+			"Whether players are allowed to launch a rocket while the launchpad is occupied by another player or rocket."
+		)]
+		public bool allowLaunchOnOccupiedPad = false;
+
+		[ServerConfigVariable(
+			"Path to the planets pack folder (e.g. '.../Spaceflight Simulator_Data/Custom Solar Systems/PlanetsPackNAME').",
+			"Leave empty to disable planets pack sync."
+		)]
+		public string planetsPackPath = "";
+
 		public string Serialize()
 		{
 			StringBuilder result = new StringBuilder();
@@ -173,7 +184,7 @@ namespace MultiplayerSFS.Server
 					try
 					{
                         FieldInfo field = result.GetType().GetField(key);
-                        if (field == null) continue; // 跳过旧配置中的无效项
+                        if (field == null) continue;
 						field.SetValue(result, Convert.ChangeType(value, field.FieldType, CultureInfo.InvariantCulture));
 						keys.Add(key);
 						Logger.Info(key + ": " + field.GetValue(result));
@@ -183,14 +194,12 @@ namespace MultiplayerSFS.Server
 						throw new Exception($"Variable deserialization error ({key})", ex);
 					}
 				}
-
-				// 输出配置文件中不存在的字段
-				foreach (var field in result.GetType().GetFields())
-				{
-					if (field.GetCustomAttribute<ServerConfigVariable>() == null) continue;
-					if (keys.Contains(field.Name)) continue;
-					Logger.Info(field.Name + ": " + field.GetValue(result));
-				}
+				// foreach (var field in result.GetType().GetFields())
+				// {
+				// 	if (field.GetCustomAttribute<ServerConfigVariable>() == null) continue;
+				// 	if (keys.Contains(field.Name)) continue;
+				// 	Logger.Info(field.Name + ": " + field.GetValue(result));
+				// }
 				
 				return result;
 			}

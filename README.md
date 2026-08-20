@@ -1,7 +1,7 @@
-
 # Multiplayer Mod
 
 A (WIP) multiplayer mod for the game Spaceflight Simulator.
+
 
 
 ### Server Setup & Game Guide
@@ -25,24 +25,18 @@ A (WIP) multiplayer mod for the game Spaceflight Simulator.
 ---
 
 ### Joining the Game
-
 1. Copy `Lidgren.Network.dll` and `Mod.dll` into your SFS **Mods** folder.
    - **Note:** This mod requires `UITools` to be installed as well.
-
 2. Launch Spaceflight Simulator.
-
 3. From the main menu, select the **"Multiplayer"** option.
-
 4. Enter the server address:
    - For a local server, enter `127.0.0.1`.
    - For a remote server, enter the server's IP address or domain name.
-
 5. Click **"Connect"** to join the game.
 
 ---
 
-## Chat Commands
-
+## Commands
 | Command | Description |
 |---------|-------------|
 | `/help [command]` | Show detailed help for a specific command. |
@@ -67,6 +61,13 @@ A (WIP) multiplayer mod for the game Spaceflight Simulator.
 | | - `infinitebuildarea` – Unlimited build area |
 | | - `partclipping` – Allow part clipping |
 | | **Example:** `/cheat infinitefuel true` |
+| `/ban [IP/PLAYER] [time]` | Ban a player by name or IP address. `time` is in **hours** (optional; empty = permanent). |
+| | **Example:** `/ban 192.168.1.5 24` or `/ban Steve` |
+| `/unban [IP/PLAYER]` | Remove a ban for the given name or IP address. |
+| `/banlist` | List all currently banned players. |
+
+
+
 
 
 Based On

@@ -8,10 +8,7 @@ using SFS.IO;
 using SFS.Parts;
 using SFS.World;
 using SFS.WorldBase;
-using SFS.Parsers.Json;
 using Random = System.Random;
-using static SFS.World.WorldSave;
-
 namespace MultiplayerSFS.Common
 {
     public static class IDExtensions
@@ -39,11 +36,14 @@ namespace MultiplayerSFS.Common
             return id;
         }
     }
-
     public class WorldState
     {
         public double initWorldTime;
         public Stopwatch worldTimer = Stopwatch.StartNew();
+        /// <summary>
+        /// 时间加速倍率
+        /// </summary>
+        public double timeWarpScale = 1.0;
         public double WorldTime
         {
             get
@@ -51,10 +51,10 @@ namespace MultiplayerSFS.Common
                 if (worldTimer.ElapsedTicks > 1000 * Stopwatch.Frequency)
                 {
                     // * Safety measure to prevent floating-point precision errors server-side.
-                    initWorldTime += worldTimer.Elapsed.TotalSeconds;
+                    initWorldTime += worldTimer.Elapsed.TotalSeconds * timeWarpScale;
                     worldTimer.Restart();
                 }
-                return initWorldTime + worldTimer.Elapsed.TotalSeconds;
+                return initWorldTime + worldTimer.Elapsed.TotalSeconds * timeWarpScale;
             }
             set
             {
@@ -63,40 +63,35 @@ namespace MultiplayerSFS.Common
             }
         }
 
-        public SFS.WorldBase.Difficulty.DifficultyType difficulty;
+        public Difficulty.DifficultyType difficulty;
         public string solarSystemName = "";
         public Dictionary<int, RocketState> rockets;
 
         public WorldState()
         {
             initWorldTime = 1000000.0;
-            difficulty = SFS.WorldBase.Difficulty.DifficultyType.Normal;
+            difficulty = Difficulty.DifficultyType.Normal;
             solarSystemName = "";
             rockets = new Dictionary<int, RocketState>();
         }
-
         public WorldState(string path)
         {
-            // 设置程序集权限绕过安全限制
             System.Security.Permissions.SecurityPermission securityPermission = 
                 new System.Security.Permissions.SecurityPermission(System.Security.Permissions.SecurityPermissionFlag.AllFlags);
             securityPermission.Assert();
-            
+        
             try
             {
-                // 反射调用JsonWrapper
                 LoadWorldStateWithReflection(path);
             }
             catch (Exception ex)
             {
-                // 使用默认值
-                System.Console.WriteLine($"[WARNING] Failed to load world state: {ex.Message}");
-                System.Console.WriteLine($"[WARNING] Using default world state values.");
+                Console.WriteLine($"[WARNING] Failed to load world state: {ex.Message}");
+                Console.WriteLine($"[WARNING] Using default world state values.");
                 InitializeWithDefaults();
             }
             finally
             {
-                // 恢复权限
                 System.Security.Permissions.SecurityPermission.RevertAssert();
             }
         }
@@ -109,18 +104,14 @@ namespace MultiplayerSFS.Common
                 throw new Exception("Save folder cannot be found or does not exist.");
             if (!persistent.FolderExists())
                 throw new Exception("'Persistent' folder cannot be found or does not exist.");
-
-            // 反射调用JsonWrapper.TryLoadJson
             var jsonWrapperType = typeof(SFS.Parsers.Json.JsonWrapper);
             var tryLoadJsonMethod = jsonWrapperType.GetMethod("TryLoadJson", 
-                new System.Type[] { typeof(SFS.IO.FilePath), typeof(object).MakeByRefType() });
-            
+                new Type[] { typeof(FilePath), typeof(object).MakeByRefType() });
             if (tryLoadJsonMethod == null)
             {
                 throw new Exception("JsonWrapper.TryLoadJson method not found");
             }
-            
-            // 加载WorldSettings
+            //加载WorldSettings
             object settings = null;
             var settingsArgs = new object[] { folder.ExtendToFile("WorldSettings.txt"), null };
             var settingsMethod = tryLoadJsonMethod.MakeGenericMethod(typeof(WorldSettings));
@@ -128,7 +119,6 @@ namespace MultiplayerSFS.Common
             if (!settingsLoaded)
                 throw new Exception("'WorldSettings.txt' file cannot be found or could not be loaded.");
             WorldSettings worldSettings = (WorldSettings)settingsArgs[1];
-            
             // 读取星系名称
             solarSystemName = "";
             var solarSystemProperty = typeof(WorldSettings).GetProperty("solarSystem");
@@ -148,9 +138,7 @@ namespace MultiplayerSFS.Common
                     }
                 }
             }
-            
-            System.Console.WriteLine($"[INFO] Loaded solar system: '{solarSystemName}'");
-            
+            Console.WriteLine($"[INFO] Loaded solar system: '{solarSystemName}'");
             // 加载WorldState
             object state = null;
             var stateArgs = new object[] { persistent.ExtendToFile("WorldState.txt"), null };
@@ -159,7 +147,6 @@ namespace MultiplayerSFS.Common
             if (!stateLoaded)
                 throw new Exception("'WorldState.txt' file cannot be found or could not be loaded.");
             WorldSave.WorldState worldState = (WorldSave.WorldState)stateArgs[1];
-            
             // 加载Rockets
             object rocketSaves = null;
             var rocketsArgs = new object[] { persistent.ExtendToFile("Rockets.txt"), null };
@@ -168,7 +155,6 @@ namespace MultiplayerSFS.Common
             if (!rocketsLoaded)
                 throw new Exception("'Rockets.txt' file cannot be found or could not be loaded.");
             List<RocketSave> rocketSavesList = (List<RocketSave>)rocketsArgs[1];
-            
             // 设置世界状态
             initWorldTime = worldState.worldTime;
             difficulty = worldSettings.difficulty.difficulty;
@@ -184,7 +170,7 @@ namespace MultiplayerSFS.Common
         private void InitializeWithDefaults()
         {
             initWorldTime = 0.0;
-            difficulty = SFS.WorldBase.Difficulty.DifficultyType.Normal;
+            difficulty = Difficulty.DifficultyType.Normal;
             solarSystemName = "";
             rockets = new Dictionary<int, RocketState>();
         }

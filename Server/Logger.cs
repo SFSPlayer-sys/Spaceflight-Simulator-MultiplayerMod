@@ -1,6 +1,6 @@
 using System;
 
-namespace MultiplayerSFS.Server
+namespace MultiplayerSFS
 {
     public static class Logger
     {

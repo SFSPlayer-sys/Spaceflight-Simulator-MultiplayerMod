@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Threading.Tasks;
 using Lidgren.Network;
 
 namespace MultiplayerSFS.ServerCommon
@@ -38,16 +39,20 @@ namespace MultiplayerSFS.ServerCommon
     {
         public double initWorldTime;
         public Stopwatch worldTimer = Stopwatch.StartNew();
+        /// <summary>
+        /// 时间加速倍率，世界时间按此倍率推进
+        /// </summary>
+        public double timeWarpScale = 1.0;
         public double WorldTime
         {
             get
             {
                 if (worldTimer.ElapsedTicks > 1000 * Stopwatch.Frequency)
                 {
-                    initWorldTime += worldTimer.Elapsed.TotalSeconds;
+                    initWorldTime += worldTimer.Elapsed.TotalSeconds * timeWarpScale;
                     worldTimer.Restart();
                 }
-                return initWorldTime + worldTimer.Elapsed.TotalSeconds;
+                return initWorldTime + worldTimer.Elapsed.TotalSeconds * timeWarpScale;
             }
             set
             {
@@ -101,8 +106,23 @@ namespace MultiplayerSFS.ServerCommon
                 InitializeWithDefaults();
             }
         }
-        
-        public void SaveWorld()
+        private bool isSaving = false;
+
+        public async Task SaveWorld()
+        {
+            if (isSaving) return;
+            isSaving = true;
+            try
+            {
+                await Task.Run(() => SaveWorldSync());
+            }
+            finally
+            {
+                isSaving = false;
+            }
+        }
+
+        private void SaveWorldSync()
         {
             if (string.IsNullOrEmpty(savePath))
             {
@@ -292,7 +312,7 @@ namespace MultiplayerSFS.ServerCommon
             
             if (configureCheats)
             {
-                Logger.Info("\n=== Cheat Settings ===", true);
+                Logger.Info("\nCheat Settings", true);
                 Console.Write("Infinite fuel (true/false, default: false): ");
                 string infiniteFuelInput = Console.ReadLine();
                 infiniteFuel = !string.IsNullOrWhiteSpace(infiniteFuelInput) && bool.TryParse(infiniteFuelInput, out bool parsedInfiniteFuel) && parsedInfiniteFuel;

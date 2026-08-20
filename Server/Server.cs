@@ -20,6 +20,12 @@ namespace MultiplayerSFS.Server
 		public static ServerSettings settings;
 		public static WorldState world;
 		public static Dictionary<IPEndPoint, ConnectedPlayer> connectedPlayers;
+		/// <summary>
+		/// 服务器星球包（配置为空时未启用）
+		/// </summary>
+		public static byte[] planetsPackData;
+		public static string planetsPackName = "";
+		public static string planetsPackHash = "";
 
 		public static void Initialize(ServerSettings settings)
 		{
@@ -67,6 +73,25 @@ namespace MultiplayerSFS.Server
 			connectedPlayers = new Dictionary<IPEndPoint, ConnectedPlayer>();
 			BanManager.Load();
 			lastWorldSave = DateTime.Now;
+
+			// 加载星球包
+			planetsPackData = null;
+			planetsPackName = "";
+			planetsPackHash = "";
+			if (!string.IsNullOrWhiteSpace(settings.planetsPackPath))
+			{
+				try
+				{
+					planetsPackData = PlanetsPackTool.Pack(settings.planetsPackPath);
+					planetsPackName = new DirectoryInfo(settings.planetsPackPath).Name;
+					planetsPackHash = PlanetsPackTool.ComputeHash(planetsPackData);
+					Logger.Info($"Loaded planets pack '{planetsPackName}' ({planetsPackData.Length} bytes, hash {planetsPackHash}).", true);
+				}
+				catch (Exception ex)
+				{
+					Logger.Error($"Failed to load planets pack: {ex.Message}");
+				}
+			}
 		}
 
 		public static void Run()
@@ -78,6 +103,7 @@ namespace MultiplayerSFS.Server
 				while (true)
 				{
 					Listen();
+					ProcessSingleMessage(server.WaitMessage(10));
 					
 					if ((DateTime.Now - lastAuthorityUpdate).TotalMilliseconds >= AuthorityUpdateIntervalMs)
 					{
@@ -87,11 +113,14 @@ namespace MultiplayerSFS.Server
 					
 					if ((DateTime.Now - lastWorldSave).TotalSeconds >= settings.worldSaveInterval)
 					{
-						world.SaveWorld();
+						_ = world.SaveWorld();
 						lastWorldSave = DateTime.Now;
 					}
-					
-					System.Threading.Thread.Sleep(10);
+					if ((DateTime.Now - lastBanCleanup).TotalSeconds >= 300)
+					{
+						BanManager.CleanupExpired();
+						lastBanCleanup = DateTime.Now;
+					}
 				}
 			}
 			catch (Exception e)
@@ -105,6 +134,7 @@ namespace MultiplayerSFS.Server
         
         private static DateTime lastWorldSave = DateTime.MinValue;
         
+        private static DateTime lastBanCleanup = DateTime.MinValue;
         private static HashSet<int> controlledRocketsCache = new HashSet<int>();
         private static Dictionary<int, Double2> playerPositionsCache = new Dictionary<int, Double2>();
 
@@ -113,6 +143,7 @@ namespace MultiplayerSFS.Server
 		/// </summary>
 		static void ProcessSingleMessage(NetIncomingMessage msg)
 		{
+			if (msg == null) return; // WaitMessage 超时返回 null
 			switch (msg.MessageType)
 			{
 				case NetIncomingMessageType.StatusChanged:
@@ -123,6 +154,9 @@ namespace MultiplayerSFS.Server
 					break;
 				case NetIncomingMessageType.ConnectionLatencyUpdated:
 					OnLatencyUpdated(msg);
+					break;
+				case NetIncomingMessageType.DiscoveryRequest:
+					OnDiscoveryRequest(msg);
 					break;
 				case NetIncomingMessageType.Data:
 					OnIncomingPacket(msg);
@@ -209,6 +243,9 @@ namespace MultiplayerSFS.Server
 				Logger.Warning("Attempted to send packet to null connection.");
 				return;
 			}
+			ConnectedPlayer player = FindPlayer(connection);
+			if (player != null && BanManager.IsBannedQuick(player.username, connection.RemoteEndPoint))
+				return; // 被 ban 的连接不发送数据包
 			// Logger.Debug($"Sending packet of type '{packet.Type}'.");
 			NetOutgoingMessage msg = server.CreateMessage();
 			msg.Write((byte) packet.Type);
@@ -216,7 +253,7 @@ namespace MultiplayerSFS.Server
 			server.SendMessage(msg, connection, method);
 		}
 
-		public static void SendPacketToAll(Packet packet, NetConnection except = null, NetDeliveryMethod method = NetDeliveryMethod.ReliableOrdered)
+		public static void SendPacketToAll(Packet packet, NetConnection except = null!, NetDeliveryMethod method = NetDeliveryMethod.ReliableOrdered)
 		{
 			// Logger.Debug($"Sending packet of type '{packet.Type}' to all.");
 			NetOutgoingMessage msg = server.CreateMessage();
@@ -319,6 +356,9 @@ namespace MultiplayerSFS.Server
 					Difficulty = world.difficulty,
 					SolarSystemName = world.solarSystemName,
 					ServerName = settings.serverName,
+					AllowLaunchOnOccupiedPad = settings.allowLaunchOnOccupiedPad,
+					PlanetsPackName = planetsPackName,
+					PlanetsPackHash = planetsPackHash,
 				}
 			);
 			connection.Approve(joinResponse);
@@ -390,6 +430,14 @@ namespace MultiplayerSFS.Server
 				},
 				connection
 			);
+			// 世界数据等客户端就绪（ClientReady）后发送
+		}
+
+		static void SendWorldDataToPlayer(NetConnection connection)
+		{
+			ConnectedPlayer player = FindPlayer(connection);
+			if (player == null)
+				return;
 			foreach (KeyValuePair<int, RocketState> kvp in world.rockets)
 			{
 				SendPacketToPlayer
@@ -446,7 +494,7 @@ namespace MultiplayerSFS.Server
 			// 发送 MOTD 给新玩家
 			if (!string.IsNullOrWhiteSpace(settings.motd))
 			{
-				System.Drawing.Color motdColor = System.Drawing.Color.Blue;
+				Color motdColor = new Color(0, 0, 1, 1);
 				if (!string.IsNullOrWhiteSpace(settings.motdColor))
 				{
 					string colorStr = settings.motdColor;
@@ -463,7 +511,7 @@ namespace MultiplayerSFS.Server
 							{
 								a = Convert.ToInt32(colorStr.Substring(6, 2), 16);
 							}
-							motdColor = System.Drawing.Color.FromArgb(a, r, g, b);
+							motdColor = new Color(r / 255f, g / 255f, b / 255f, a / 255f);
 						}
 						catch {}
 					}
@@ -667,6 +715,14 @@ namespace MultiplayerSFS.Server
 					return false;
 				case PacketType.TimeWarpVoteResponse:
 					OnPacket_TimeWarpVoteResponse(msg);
+					return false;
+				
+				// * Planets Pack Packets
+				case PacketType.PlanetsPackRequest:
+					OnPacket_PlanetsPackRequest(msg);
+					return false;
+				case PacketType.ClientReady:
+					OnPacket_ClientReady(msg);
 					return false;
 				
 				case PacketType.JoinRequest:
@@ -939,6 +995,7 @@ namespace MultiplayerSFS.Server
 			isTimeWarping = false;
 			currentTimeScale = 1f;
 			currentPhysicsWarp = false;
+			world.timeWarpScale = 1.0;
 			
 			// 广播给所有玩家停止时间加速
 			SendPacketToAll(new Packet_TimeWarpResult()
@@ -979,6 +1036,7 @@ namespace MultiplayerSFS.Server
 			isTimeWarping = true;
 			currentTimeScale = requestedTimeScale;
 			currentPhysicsWarp = requestedPhysicsWarp;
+			world.timeWarpScale = requestedTimeScale;
 			
 			SendPacketToAll(new Packet_TimeWarpResult()
 			{
@@ -1055,6 +1113,7 @@ namespace MultiplayerSFS.Server
 				isTimeWarping = true;
 				currentTimeScale = requestedTimeScale;
 				currentPhysicsWarp = requestedPhysicsWarp;
+				world.timeWarpScale = requestedTimeScale;
 				
 				SendPacketToAll(new Packet_TimeWarpResult()
 				{
@@ -1090,6 +1149,42 @@ namespace MultiplayerSFS.Server
 			}
 		}
 	}
+	// * Planets Pack Sync
+	static void OnPacket_PlanetsPackRequest(NetIncomingMessage msg)
+	{
+		Packet_PlanetsPackRequest packet = msg.Read<Packet_PlanetsPackRequest>();
+		ConnectedPlayer player = FindPlayer(msg.SenderConnection);
+		if (player == null || planetsPackData == null || packet.PackName != planetsPackName)
+			return;
+		const int chunkSize = 64 * 1024;
+		int chunkCount = (planetsPackData.Length + chunkSize - 1) / chunkSize;
+		for (int i = 0; i < chunkCount; i++)
+		{
+			int len = Math.Min(chunkSize, planetsPackData.Length - i * chunkSize);
+			byte[] chunk = new byte[len];
+			Array.Copy(planetsPackData, i * chunkSize, chunk, 0, len);
+			SendPacketToPlayer(msg.SenderConnection, new Packet_PlanetsPackData()
+			{
+				PackName = planetsPackName,
+				Hash = planetsPackHash,
+				ChunkIndex = i,
+				ChunkCount = chunkCount,
+				Data = chunk,
+			});
+		}
+		Logger.Info($"Sent planets pack '{planetsPackName}' to {player.username} ({chunkCount} chunks).", true);
+	}
+
+	static void OnPacket_ClientReady(NetIncomingMessage msg)
+	{
+		msg.Read<Packet_ClientReady>();
+		ConnectedPlayer player = FindPlayer(msg.SenderConnection);
+		if (player == null || player.ready)
+			return;
+		player.ready = true;
+		Logger.Info($"{player.username} is ready, sending world data...", true);
+		SendWorldDataToPlayer(msg.SenderConnection);
+	}
 	}
 
 	public class ConnectedPlayer
@@ -1104,12 +1199,15 @@ namespace MultiplayerSFS.Server
 
 		public int controlledRocket;
 		public HashSet<int> updateAuthority;
+		/// <summary>
+		/// 是否已就绪（收到 ClientReady，可以接收世界数据）
+		/// </summary>
+		public bool ready;
 
 		static readonly System.Random colorRandom = new System.Random();
 		static Color GetRandomColor()
 		{
-			float rand = (float) Math.Round(100 * colorRandom.NextDouble());
-			return Color.HSVToRGB(rand / 100, 1, 1);
+			return Color.HSVToRGB(colorRandom.Next(0, 101) / 100f, 1, 1);
 		}
 
 		public ConnectedPlayer(string playerName)
@@ -1224,6 +1322,26 @@ namespace MultiplayerSFS.Server
 		}
 
 		/// <summary>
+		/// 清理已过期的封禁记录
+		/// </summary>
+		public static void CleanupExpired()
+		{
+			long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+			if (bans.RemoveAll(b => b.durationSeconds != 0 && now - b.bannedAt >= b.durationSeconds) > 0)
+				Save();
+		}
+
+		/// <summary>
+		/// 只读检查是否被封禁（不过期清理）
+		/// </summary>
+		public static bool IsBannedQuick(string username, IPEndPoint endpoint)
+		{
+			return bans.Any(ban => ban.isIP
+				? ban.target == endpoint.Address.ToString()
+				: string.Equals(ban.target, username, StringComparison.OrdinalIgnoreCase));
+		}
+
+		/// <summary>
 		/// 封禁目标，返回结果消息
 		/// </summary>
 		public static string BanTarget(string target, long durationHours)
@@ -1240,14 +1358,14 @@ namespace MultiplayerSFS.Server
 				durationSeconds = durationHours > 0 ? durationHours * 3600 : 0,
 			});
 			Save();
-			// 封玩家名时踢出同名玩家
-			if (!isIP)
+			// 踢出所有匹配的在线玩家（同名或同 IP）
+			foreach (var kvp in Server.connectedPlayers.ToList())
 			{
-				foreach (var kvp in Server.connectedPlayers.ToList())
-				{
-					if (string.Equals(kvp.Value.username, target, StringComparison.OrdinalIgnoreCase))
-						Server.server.GetConnection(kvp.Key)?.Disconnect("You have been banned from this server.");
-				}
+				bool match = isIP
+					? kvp.Key.Address.ToString() == target
+					: string.Equals(kvp.Value.username, target, StringComparison.OrdinalIgnoreCase);
+				if (match)
+					Server.server.GetConnection(kvp.Key)?.Disconnect("You have been banned from this server.");
 			}
 			return durationHours > 0
 				? $"Banned '{target}' for {durationHours} hour(s)."

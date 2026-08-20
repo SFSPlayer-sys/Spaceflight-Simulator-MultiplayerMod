@@ -103,7 +103,6 @@ namespace MultiplayerSFS.Mod
 
             input_colorPicker.field.onValueChanged.AddListener(OnColorPickerChange);
             OnColorPickerChange(hue.ToString());
-
             // * 2 * -60 for both the color picker and the chat input.
             RemainingHeight -= 60 + 60;
 
@@ -230,7 +229,6 @@ namespace MultiplayerSFS.Mod
                 };
                 cooldownTimer.Elapsed += (s, e) => 
                 {
-                    // 将任务添加到主线程执行队列
                     lock (mainThreadActionsLock)
                     {
                         mainThreadActions.Enqueue(new System.Action(() => ChangeCooldownStatus(true)));
@@ -238,8 +236,6 @@ namespace MultiplayerSFS.Mod
                 };
             }
         }
-
-        // 在主线程执行队列中的任务
         public static void Update()
         {
             while (true)

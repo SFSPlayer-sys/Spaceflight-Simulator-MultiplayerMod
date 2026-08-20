@@ -1,11 +1,14 @@
 using System.Collections.Generic;
 using Lidgren.Network;
 using UnityEngine;
+
+#if NET48
 using SFS.World;
 using SFS.WorldBase;
-using static SFS.World.WorldSave;
-
 namespace MultiplayerSFS.Common
+#else
+namespace MultiplayerSFS.ServerCommon
+#endif
 {
     public enum PacketType
     {
@@ -108,7 +111,6 @@ namespace MultiplayerSFS.Common
         /// Sent by the server to update cheat status for all players.
         /// </summary>
         UpdateCheatStatus,
-
         // * Time Warp Packets
         /// <summary>
         /// Sent by player to request time warp, includes the requested time scale.
@@ -126,6 +128,12 @@ namespace MultiplayerSFS.Common
         /// Sent by server to notify all players of time warp result (start or stop).
         /// </summary>
         TimeWarpResult,
+        /// <summary>
+        /// Sent by client to request the server's planets pack.
+        /// </summary>
+        PlanetsPackRequest,
+        PlanetsPackData,
+        ClientReady,
     }
 
     public abstract class Packet : INetData
@@ -153,6 +161,10 @@ namespace MultiplayerSFS.Common
         public string Password { get; set; }
         public string SolarSystemName { get; set; } = "";
         public string GameVersion { get; set; } = "";
+        /// <summary>
+        /// 本机所有星球包的 SHA256
+        /// </summary>
+        public List<string> PlanetsPackHashes { get; set; } = new List<string>();
 
         /// <summary>
         /// 计算密码的 SHA256 哈希
@@ -176,6 +188,7 @@ namespace MultiplayerSFS.Common
             msg.Write(Password);
             msg.Write(SolarSystemName);
             msg.Write(GameVersion);
+            msg.WriteCollection(PlanetsPackHashes, msg.Write);
         }
         public override void Deserialize(NetIncomingMessage msg)
         {
@@ -183,6 +196,7 @@ namespace MultiplayerSFS.Common
             Password = msg.ReadString();
             SolarSystemName = msg.ReadString();
             GameVersion = msg.ReadString();
+            PlanetsPackHashes = msg.ReadCollection(count => new List<string>(count), msg.ReadString);
         }
     }
     public class Packet_JoinResponse : Packet
@@ -192,9 +206,16 @@ namespace MultiplayerSFS.Common
         public double ChatMessageCooldown { get; set; }
         public double WorldTime { get; set; } = double.NaN;
         public double SendTime { get; set; }
-        public SFS.WorldBase.Difficulty.DifficultyType Difficulty { get; set; }
+#if NET48
+        public Difficulty.DifficultyType Difficulty { get; set; }
+#else
+        public int Difficulty { get; set; }
+#endif
         public string SolarSystemName { get; set; } = "";
         public string ServerName { get; set; } = "";
+        public bool AllowLaunchOnOccupiedPad { get; set; }
+        public string PlanetsPackName { get; set; } = "";
+        public string PlanetsPackHash { get; set; } = "";
 
         public override PacketType Type => PacketType.JoinResponse;
         public override void Serialize(NetOutgoingMessage msg)
@@ -207,6 +228,9 @@ namespace MultiplayerSFS.Common
             msg.Write((byte) Difficulty);
             msg.Write(SolarSystemName);
             msg.Write(ServerName);
+            msg.Write(AllowLaunchOnOccupiedPad);
+            msg.Write(PlanetsPackName);
+            msg.Write(PlanetsPackHash);
         }
 
         public override void Deserialize(NetIncomingMessage msg)
@@ -216,9 +240,16 @@ namespace MultiplayerSFS.Common
             ChatMessageCooldown = msg.ReadDouble();
             WorldTime = msg.ReadDouble();
             SendTime = msg.ReadDouble();
-            Difficulty = (SFS.WorldBase.Difficulty.DifficultyType) msg.ReadByte();
+#if NET48
+            Difficulty = (Difficulty.DifficultyType) msg.ReadByte();
+#else
+            Difficulty = msg.ReadByte();
+#endif
             SolarSystemName = msg.ReadString();
             ServerName = msg.ReadString();
+            AllowLaunchOnOccupiedPad = msg.ReadBoolean();
+            PlanetsPackName = msg.ReadString();
+            PlanetsPackHash = msg.ReadString();
         }
     }
     public class Packet_PlayerConnected : Packet
@@ -327,7 +358,7 @@ namespace MultiplayerSFS.Common
     {
         public int SenderId { get; set; } = -1;
         public string Message { get; set; }
-        public UnityEngine.Color Color { get; set; } = UnityEngine.Color.white; // 默认白色
+        public Color Color { get; set; } = new Color(1, 1, 1, 1); // 默认白色
 
         public override PacketType Type => PacketType.SendChatMessage;
         public override void Serialize(NetOutgoingMessage msg)
@@ -347,7 +378,7 @@ namespace MultiplayerSFS.Common
             float g = msg.ReadFloat();
             float b = msg.ReadFloat();
             float a = msg.ReadFloat();
-            Color = new UnityEngine.Color(r, g, b, a);
+            Color = new Color(r, g, b, a);
         }
     }
 
@@ -397,7 +428,11 @@ namespace MultiplayerSFS.Common
     {
         public double WorldTime { get; set; } = double.NaN;
         public int RocketId { get; set; } = -1;
+#if NET48
         public DestructionReason Reason { get; set; }
+#else
+        public int Reason { get; set; }
+#endif
 
         public override PacketType Type => PacketType.DestroyRocket;
         public override void Serialize(NetOutgoingMessage msg)
@@ -410,7 +445,11 @@ namespace MultiplayerSFS.Common
         {
             WorldTime = msg.ReadDouble();
             RocketId = msg.ReadInt32();
+#if NET48
             Reason = (DestructionReason) msg.ReadByte();
+#else
+            Reason = msg.ReadByte();
+#endif
         }
     }
     public class Packet_UpdateRocketPrimary : Packet
@@ -487,7 +526,11 @@ namespace MultiplayerSFS.Common
         public int RocketId { get; set; } = -1;
         public int PartId { get; set; } = -1;
         public bool CreateExplosion { get; set; }
+#if NET48
         public DestructionReason Reason { get; set; }
+#else
+        public int Reason { get; set; }
+#endif
 
         public override PacketType Type => PacketType.DestroyPart;
         public override void Serialize(NetOutgoingMessage msg)
@@ -504,7 +547,11 @@ namespace MultiplayerSFS.Common
             RocketId = msg.ReadInt32();
             PartId = msg.ReadInt32();
             CreateExplosion = msg.ReadBoolean();
+#if NET48
             Reason = (DestructionReason) msg.ReadByte();
+#else
+            Reason = msg.ReadByte();
+#endif
         }
     }
     public class Packet_UpdateStaging : Packet
@@ -809,5 +856,55 @@ namespace MultiplayerSFS.Common
             StopperName = msg.ReadString();
             RejecterName = msg.ReadString();
         }
+    }
+
+    // * Planets Pack Packets
+    public class Packet_PlanetsPackRequest : Packet
+    {
+        public string PackName { get; set; } = "";
+
+        public override PacketType Type => PacketType.PlanetsPackRequest;
+        public override void Serialize(NetOutgoingMessage msg)
+        {
+            msg.Write(PackName);
+        }
+        public override void Deserialize(NetIncomingMessage msg)
+        {
+            PackName = msg.ReadString();
+        }
+    }
+
+    public class Packet_PlanetsPackData : Packet
+    {
+        public string PackName { get; set; } = "";
+        public string Hash { get; set; } = "";
+        public int ChunkIndex { get; set; }
+        public int ChunkCount { get; set; }
+        public byte[] Data { get; set; }
+
+        public override PacketType Type => PacketType.PlanetsPackData;
+        public override void Serialize(NetOutgoingMessage msg)
+        {
+            msg.Write(PackName);
+            msg.Write(Hash);
+            msg.Write(ChunkIndex);
+            msg.Write(ChunkCount);
+            msg.Write(Data);
+        }
+        public override void Deserialize(NetIncomingMessage msg)
+        {
+            PackName = msg.ReadString();
+            Hash = msg.ReadString();
+            ChunkIndex = msg.ReadInt32();
+            ChunkCount = msg.ReadInt32();
+            Data = msg.ReadBytes(msg.ReadInt32());
+        }
+    }
+
+    public class Packet_ClientReady : Packet
+    {
+        public override PacketType Type => PacketType.ClientReady;
+        public override void Serialize(NetOutgoingMessage msg) { }
+        public override void Deserialize(NetIncomingMessage msg) { }
     }
 }

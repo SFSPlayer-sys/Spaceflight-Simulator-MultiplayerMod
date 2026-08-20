@@ -110,6 +110,14 @@ namespace MultiplayerSFS.Mod
         // 在主线程执行队列中的任务
         public static void Update()
         {
+            // 本地连续推进世界时间，避免星球只在服务器同步时跳变
+            if (WorldTime.main != null)
+            {
+                double increment = WorldTime.main.realtimePhysics.Value
+                    ? Time.deltaTime
+                    : WorldTime.main.timewarpSpeed * Time.deltaTime;
+                ClientManager.world.WorldTime += increment;
+            }
             while (true)
             {
                 System.Action action = null;
@@ -143,9 +151,9 @@ namespace MultiplayerSFS.Mod
                     prevResourcePercents.Remove(module);
                 }
             }
-            foreach (int id in updateAuthority)
+            foreach (int id in updateAuthority.ToList())
             {
-                if (syncedRockets.TryGetValue(id, out LocalRocket localRocket) && localRocket.rocket is Rocket rocket)
+                if (syncedRockets.TryGetValue(id, out LocalRocket localRocket) && localRocket.rocket is Rocket rocket && rocket.rb2d != null)
                 {
                     Packet_UpdateRocketPrimary primary = rocket.ToUpdatePacketPrimary(id);
                     Packet_UpdateRocketSecondary secondary = rocket.ToUpdatePacketSecondary(id);
@@ -191,7 +199,9 @@ namespace MultiplayerSFS.Mod
                 }
                 else
                 {
-                    Debug.LogError("Missing local rocket while trying to send update packets!");
+                    // 火箭已被销毁，清理残留数据
+                    syncedRockets.Remove(id);
+                    updateAuthority.Remove(id);
                 }
             }
         }
@@ -320,6 +330,7 @@ namespace MultiplayerSFS.Mod
                 RocketManager.DestroyRocket(rocket.rocket, CustomDestructionReason);
             }
             syncedRockets.Remove(id);
+            updateAuthority.Remove(id);
         }
 
         public static void OnLoadWorld()

@@ -7,67 +7,48 @@ set PUBLISH_ALL=N
 if /I "%1"=="Y" set PUBLISH_ALL=Y
 if "%PUBLISH_ALL%"=="Y" goto :full
 goto :quick
-
 :quick
-REM Quick mode: build the mod + publish win-x64 non-self-contained server only
 cd /d "%MOD_DIR%"
 dotnet build -c Release
 if %ERRORLEVEL% NEQ 0 goto :error
-
 if not exist "%RELEASE_DIR%\Mod" mkdir "%RELEASE_DIR%\Mod"
 copy "%MOD_DIR%\bin\Release\net4.8\Multiplayer.dll" "%RELEASE_DIR%\Mod\" /Y >nul
 copy "%MOD_DIR%\bin\Release\net4.8\Lidgren.Network.dll" "%RELEASE_DIR%\Mod\" /Y >nul
-
 cd /d "%SERVER_DIR%"
 dotnet publish -c Release -f net6.0 -r win-x64 --self-contained false -p:PublishSingleFile=true -p:DebugType=None -o "%RELEASE_DIR%\Server-Windows-x64-NonSelfContained"
 if %ERRORLEVEL% NEQ 0 goto :error
 goto :launch
-
 :full
-REM Full mode: build the mod + publish servers for all platforms
 cd /d "%MOD_DIR%"
 dotnet build -c Release
 if %ERRORLEVEL% NEQ 0 goto :error
-
 if not exist "%RELEASE_DIR%\Mod" mkdir "%RELEASE_DIR%\Mod"
 copy "%MOD_DIR%\bin\Release\net4.8\Multiplayer.dll" "%RELEASE_DIR%\Mod\" /Y >nul
 copy "%MOD_DIR%\bin\Release\net4.8\Lidgren.Network.dll" "%RELEASE_DIR%\Mod\" /Y >nul
-
 cd /d "%SERVER_DIR%"
 dotnet publish -c Release -f net6.0 -r win-x64 --self-contained false -p:PublishSingleFile=true -p:DebugType=None -o "%RELEASE_DIR%\Server-Windows-x64-NonSelfContained"
 if %ERRORLEVEL% NEQ 0 goto :error
-
 dotnet publish -c Release -f net6.0 -r win-x64 --self-contained true -p:PublishSingleFile=true -p:DebugType=None -o "%RELEASE_DIR%\Server-Windows-x64-SelfContained"
 if %ERRORLEVEL% NEQ 0 goto :error
-
 dotnet publish -c Release -f net6.0 -r linux-x64 --self-contained true -p:PublishSingleFile=true -p:DebugType=None -o "%RELEASE_DIR%\Server-Linux-x64-SelfContained"
 if %ERRORLEVEL% NEQ 0 goto :error
-
 dotnet publish -c Release -f net6.0 -r linux-arm64 --self-contained true -p:PublishSingleFile=true -p:DebugType=None -o "%RELEASE_DIR%\Server-Linux-ARM64-SelfContained"
 if %ERRORLEVEL% NEQ 0 goto :error
-
 dotnet publish -c Release -f net6.0 -r linux-arm --self-contained true -p:PublishSingleFile=true -p:DebugType=None -o "%RELEASE_DIR%\Server-Linux-ARM-SelfContained"
 if %ERRORLEVEL% NEQ 0 goto :error
 goto :launch
-
 :launch
-REM Copy the mod to the game Mods folder and start the server and the game
 set SFS_MODS_DIR=C:\Program Files (x86)\Steam\steamapps\common\Spaceflight Simulator\Spaceflight Simulator Game\Mods
 if not exist "%SFS_MODS_DIR%" mkdir "%SFS_MODS_DIR%"
 copy "%RELEASE_DIR%\Mod\Multiplayer.dll" "%SFS_MODS_DIR%\" /Y >nul 2>&1
-
 start "" "%RELEASE_DIR%\Server-Windows-x64-NonSelfContained\Server.exe"
-
 set SFS_EXE=C:\Program Files (x86)\Steam\steamapps\common\Spaceflight Simulator\Spaceflight Simulator Game\Spaceflight Simulator.exe
 start "" "%SFS_EXE%"
 timeout /t 2 >nul
 start "" "%SFS_EXE%"
-
 goto :end
-
 :error
 echo BUILD FAILED!
 exit /b 1
-
 :end
 pause

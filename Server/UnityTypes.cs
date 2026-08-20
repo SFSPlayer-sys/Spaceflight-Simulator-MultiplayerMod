@@ -69,7 +69,6 @@ namespace UnityEngine
         }
     }
 }
-
 namespace SFS.World
 {
     public struct Double2
@@ -88,7 +87,6 @@ namespace SFS.World
             get { return Math.Sqrt(x * x + y * y); }
         }
     }
-
     public class Difficulty
     {
         public enum DifficultyType
@@ -99,7 +97,6 @@ namespace SFS.World
         }
     }
 }
-
 namespace SFS.Parts.Modules
 {
     public struct Orientation

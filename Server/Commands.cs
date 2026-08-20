@@ -6,6 +6,7 @@ using Lidgren.Network;
 
 #if NET48
 using MultiplayerSFS.Common;
+using UnityEngine;
 #else
 using MultiplayerSFS.ServerCommon;
 #endif
@@ -14,7 +15,7 @@ namespace MultiplayerSFS.Server
 {
     public static class CommandExtensions
     {
-        public static string FormatCommand(this string name, string args = null)
+        public static string FormatCommand(this string name, string args = null!)
         {
             string formatted = $"\"{CommandManager.CommandPrefix}{name}";
             if (args != null)
@@ -472,7 +473,7 @@ namespace MultiplayerSFS.Server
             }
 
             // Parse color
-            System.Drawing.Color broadcastColor = System.Drawing.Color.White;
+            Color broadcastColor = new Color(1, 1, 1, 1);
             if (!string.IsNullOrEmpty(color) && color.StartsWith("#") && (color.Length == 7 || color.Length == 9))
             {
                 try
@@ -485,7 +486,7 @@ namespace MultiplayerSFS.Server
                     {
                         a = Convert.ToInt32(color.Substring(7, 2), 16);
                     }
-                    broadcastColor = System.Drawing.Color.FromArgb(a, r, g, b);
+                    broadcastColor = new Color(r / 255f, g / 255f, b / 255f, a / 255f);
                 }
                 catch {}
             }
@@ -650,7 +651,7 @@ namespace MultiplayerSFS.Server
             }
 
             Logger.Info("Manual world save initiated by admin.", true);
-            Server.world.SaveWorld();
+            _ = Server.world.SaveWorld();
             return "World saved successfully!";
         }
     }

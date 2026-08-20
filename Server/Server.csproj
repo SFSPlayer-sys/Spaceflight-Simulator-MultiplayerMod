@@ -6,26 +6,26 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
-
   <PropertyGroup Condition="'$(TargetFramework)' == 'net4.8'">
     <LangVersion>8.0</LangVersion>
     <ImplicitUsings>disable</ImplicitUsings>
   </PropertyGroup>
-
   <PropertyGroup Condition="'$(TargetFramework)' == 'net6.0'">
     <LangVersion>10.0</LangVersion>
   </PropertyGroup>
-
   <ItemGroup Condition="'$(TargetFramework)' == 'net4.8'">
     <Compile Include="../Common/*.cs" />
     <Compile Remove="UnityTypes.cs" />
+    <Compile Remove="ServerCommon/**/*.cs" />
   </ItemGroup>
-
+  <ItemGroup Condition="'$(TargetFramework)' == 'net6.0'">
+    <Compile Include="../Common/PlanetsPackTool.cs" Link="PlanetsPackTool.cs" />
+    <Compile Include="../Common/PacketDefs.cs" Link="PacketDefs.cs" />
+  </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Lidgren.Network" Version="1.0.2" />
     <PackageReference Include="ScottPlot" Version="5.0.55" />
   </ItemGroup>
-
   <ItemGroup Condition="'$(TargetFramework)' == 'net4.8'">
     <Reference Include="C:\Program Files (x86)\Steam\steamapps\common\Spaceflight Simulator\Spaceflight Simulator Game\Spaceflight Simulator_Data\Managed\*">
       <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Spaceflight Simulator\Spaceflight Simulator Game\Spaceflight Simulator_Data\Managed\*.dll</HintPath>
@@ -33,7 +33,6 @@
     <Reference Include="UITools">
       <HintPath>C:\Users\Administrator\Downloads\SFSs\1.5.10.2_Release\Mods\UITools\UITools.dll</HintPath>
     </Reference>
-
     <!-- ? The following DLLs cause warnings on build -->
     <Reference Remove="**/System.IO.Compression.dll" />
     <Reference Remove="**/System.Net.Http.dll" />

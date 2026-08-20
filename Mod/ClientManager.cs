@@ -25,6 +25,30 @@ namespace MultiplayerSFS.Mod
         /// Id of the local player.
         /// </summary>
         public static int playerId;
+        /// <summary>
+        /// 是否允许占用发射台时发射
+        /// </summary>
+        public static bool allowLaunchOnOccupiedPad;
+        /// <summary>
+        /// 本机所有星球包的 SHA256
+        /// </summary>
+        static readonly List<string> localPlanetsPackHashes = new List<string>();
+        /// <summary>
+        /// 星球包下载状态
+        /// </summary>
+        class PlanetsPackDownload
+        {
+            public string packName;
+            public string expectedHash;
+            public int chunkCount;
+            public byte[][] chunks;
+            public int received;
+        }
+        static PlanetsPackDownload planetsPackDownload;
+        /// <summary>
+        /// 服务器回复的连接信息
+        /// </summary>
+        static Packet_JoinResponse joinResponse;
 
         public static async Task TryConnect(JoinInfo info)
         {
@@ -46,20 +70,50 @@ namespace MultiplayerSFS.Mod
 
             NetOutgoingMessage hail = client.CreateMessage();
             
-            // 检查本地是否有该星系包
+            // 检查本地是否有该星系包，并收集所有星球包的 SHA256
             string solarSystemName = "";
+            localPlanetsPackHashes.Clear();
             try
             {
-                // 检查Custom Solar Systems目录中是否有任何星系包
+                string recordFile = Main.main != null
+                    ? System.IO.Path.Combine(Main.main.ModFolder, ".PlanetsPackPersistent")
+                    : System.IO.Path.Combine(Application.persistentDataPath, "MultiplayerSFS_PlanetsPacks.txt");
+                Dictionary<string, string> recordedHashes = new Dictionary<string, string>();
+                if (System.IO.File.Exists(recordFile))
+                {
+                    foreach (string line in System.IO.File.ReadAllLines(recordFile))
+                    {
+                        int eq = line.IndexOf('=');
+                        if (eq > 0)
+                            recordedHashes[line.Substring(0, eq)] = line.Substring(eq + 1);
+                    }
+                }
                 string customSolarSystemsPath = System.IO.Path.Combine(Application.dataPath, "Custom Solar Systems");
                 if (System.IO.Directory.Exists(customSolarSystemsPath))
                 {
                     string[] solarSystemDirectories = System.IO.Directory.GetDirectories(customSolarSystemsPath);
                     if (solarSystemDirectories.Length > 0)
                     {
-                        // 使用第一个找到的星系包名称
                         solarSystemName = System.IO.Path.GetFileName(solarSystemDirectories[0]);
                         Debug.Log($"Found local solar system: {solarSystemName}");
+                    }
+                    foreach (string dir in solarSystemDirectories)
+                    {
+                        string name = System.IO.Path.GetFileName(dir);
+
+                        if (recordedHashes.TryGetValue(name, out string recorded))
+                        {
+                            localPlanetsPackHashes.Add(recorded);
+                            continue;
+                        }
+                        try
+                        {
+                            localPlanetsPackHashes.Add(PlanetsPackTool.ComputeHash(PlanetsPackTool.Pack(dir)));
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.LogWarning($"Failed to hash planets pack '{dir}': {ex.Message}");
+                        }
                     }
                 }
             }
@@ -80,7 +134,8 @@ namespace MultiplayerSFS.Mod
                     // 发送密码哈希
                     Password = Packet_JoinRequest.GetPasswordHash(info.password),
                     SolarSystemName = solarSystemName,
-                    GameVersion = gameVersion
+                    GameVersion = gameVersion,
+                    PlanetsPackHashes = localPlanetsPackHashes,
                 }
             );
             client.Connect(new IPEndPoint(info.address, info.port), hail);
@@ -117,8 +172,9 @@ namespace MultiplayerSFS.Mod
                             goto ConnectionApproved;
                         else if (status == NetConnectionStatus.Disconnected)
                         {
-                            // 读取断开/拒绝原因
-                            if (!string.IsNullOrWhiteSpace(reason))
+                            if (!string.IsNullOrWhiteSpace(reason) && reason.IndexOf("banned", StringComparison.OrdinalIgnoreCase) >= 0)
+                                denialReason = "You have been banned from the server.";
+                            else if (!string.IsNullOrWhiteSpace(reason))
                                 denialReason = $"Unable to connect to server: {reason}";
                             goto ConnectionDenied;
                         }
@@ -161,24 +217,6 @@ namespace MultiplayerSFS.Mod
             /// </summary>
             public float lastQueried;
         }
-
-        /// <summary>
-        /// 历史服务器的本地持久化数据
-        /// </summary>
-        [Serializable]
-        public class HistoryServer
-        {
-            public string address;
-            public int port;
-            public string name;
-        }
-
-        [Serializable]
-        public class HistoryServerList
-        {
-            public List<HistoryServer> list = new List<HistoryServer>();
-        }
-
         /// <summary>
         /// 加入过的服务器列表
         /// </summary>
@@ -189,7 +227,7 @@ namespace MultiplayerSFS.Mod
         /// </summary>
         static string GetHistoryFilePath()
         {
-            return Path.Combine(Main.historyPersistentFolder.ToString(), "ServerHistory.json");
+            return Path.Combine(Main.historyPersistentFolder.ToString(), "ServerHistory.txt");
         }
 
         public static void LoadServerHistory()
@@ -200,20 +238,22 @@ namespace MultiplayerSFS.Mod
                 string path = GetHistoryFilePath();
                 if (!File.Exists(path))
                     return;
-                HistoryServerList data = JsonUtility.FromJson<HistoryServerList>(File.ReadAllText(path));
-                if (data == null)
-                    return;
-                foreach (HistoryServer entry in data.list)
+                // 每行一条：地址|端口|名字
+                foreach (string line in File.ReadAllLines(path))
                 {
-                    if (IPAddress.TryParse(entry.address, out IPAddress address))
+                    string[] parts = line.Split('|');
+                    if (parts.Length < 3)
+                        continue;
+                    if (!IPAddress.TryParse(parts[0], out IPAddress address))
+                        continue;
+                    if (!int.TryParse(parts[1], out int port))
+                        continue;
+                    serverHistory.Add(new ServerInfo()
                     {
-                        serverHistory.Add(new ServerInfo()
-                        {
-                            endpoint = new IPEndPoint(address, entry.port),
-                            name = entry.name,
-                            isHistory = true,
-                        });
-                    }
+                        endpoint = new IPEndPoint(address, port),
+                        name = parts[2],
+                        isHistory = true,
+                    });
                 }
             }
             catch (Exception e)
@@ -224,20 +264,13 @@ namespace MultiplayerSFS.Mod
 
         public static void SaveServerHistory()
         {
-            HistoryServerList data = new HistoryServerList();
-            foreach (ServerInfo server in serverHistory)
-            {
-                data.list.Add(new HistoryServer()
-                {
-                    address = server.endpoint.Address.ToString(),
-                    port = server.endpoint.Port,
-                    name = server.name,
-                });
-            }
             try
             {
+                List<string> lines = new List<string>();
+                foreach (ServerInfo server in serverHistory)
+                    lines.Add($"{server.endpoint.Address}|{server.endpoint.Port}|{server.name}");
                 Directory.CreateDirectory(Main.historyPersistentFolder.ToString());
-                File.WriteAllText(GetHistoryFilePath(), JsonUtility.ToJson(data));
+                File.WriteAllLines(GetHistoryFilePath(), lines);
             }
             catch (Exception e)
             {
@@ -355,12 +388,14 @@ namespace MultiplayerSFS.Mod
             Menu.loading.Open("Loading multiplayer world...");
             
             Packet_JoinResponse response = client.ServerConnection.RemoteHailMessage.Read<Packet_JoinResponse>();
+            joinResponse = response;
             playerId = response.PlayerId;
             AddToServerHistory(client.ServerConnection.RemoteEndPoint, response.ServerName);
             LocalManager.updateRocketsPeriod = response.UpdateRocketsPeriod;
             LocalManager.Initialize();
 
             ChatWindow.CreateCooldownTimer(response.ChatMessageCooldown);
+            allowLaunchOnOccupiedPad = response.AllowLaunchOnOccupiedPad;
             
             world = new WorldState()
             {
@@ -368,6 +403,25 @@ namespace MultiplayerSFS.Mod
                 difficulty = response.Difficulty,
                 solarSystemName = response.SolarSystemName,
             };
+
+            // 比对服务器星球包，匹配则直接进入世界
+            if (string.IsNullOrEmpty(response.PlanetsPackHash) || localPlanetsPackHashes.Contains(response.PlanetsPackHash))
+            {
+                SendPacket(new Packet_ClientReady());
+                LoadWorldScene();
+            }
+            else
+            {
+                // 服务器星球包与本地不匹配，下载星球包
+                Menu.loading.Open($"Downloading planets pack '{response.PlanetsPackName}'...");
+                planetsPackDownload = new PlanetsPackDownload() { packName = response.PlanetsPackName, expectedHash = response.PlanetsPackHash };
+                SendPacket(new Packet_PlanetsPackRequest() { PackName = response.PlanetsPackName });
+            }
+        }
+
+        static void LoadWorldScene()
+        {
+            Packet_JoinResponse response = joinResponse;
 
             // 检查本地是否存在该星系包
             bool solarSystemExists = false;
@@ -425,8 +479,11 @@ namespace MultiplayerSFS.Mod
                         break;
                     case NetIncomingMessageType.StatusChanged:
                         NetConnectionStatus status = (NetConnectionStatus) msg.ReadByte();
+                        string reason = msg.ReadString();
                         if (status == NetConnectionStatus.Disconnected)
                         {
+                            if (!string.IsNullOrWhiteSpace(reason) && reason.IndexOf("banned", StringComparison.OrdinalIgnoreCase) >= 0)
+                                ToastHelper.ShowToast("You have been banned from the server.");
                             SceneLoader.ExitToMainMenu();
                             client.Shutdown("Disconnected by server.");
                         }
@@ -523,17 +580,87 @@ namespace MultiplayerSFS.Mod
                     OnPacket_UpdatePart_ResourceModule(msg);
                     break;
                 
+                // * Planets Pack Packets
+                case PacketType.PlanetsPackData:
+                    OnPacket_PlanetsPackData(msg);
+                    break;
+
                 // * Invalid Packets
                 case PacketType.JoinResponse:
                     Debug.LogWarning($"Recieved server info packet outside of connection attempt.");
                     break;
                 case PacketType.JoinRequest:
+                case PacketType.PlanetsPackRequest:
+                case PacketType.ClientReady:
                     Debug.LogWarning($"Recieved packet (of type {packetType}) intended for the server.");
                     break;
                 default:
                     Debug.LogWarning($"Unhandled packet type ({packetType})!");
                     break;
             }
+        }
+
+        static void OnPacket_PlanetsPackData(NetIncomingMessage msg)
+        {
+            Packet_PlanetsPackData packet = msg.Read<Packet_PlanetsPackData>();
+            if (planetsPackDownload == null || packet.PackName != planetsPackDownload.packName)
+                return;
+            if (planetsPackDownload.chunks == null)
+            {
+                planetsPackDownload.chunkCount = packet.ChunkCount;
+                planetsPackDownload.chunks = new byte[packet.ChunkCount][];
+            }
+            planetsPackDownload.chunks[packet.ChunkIndex] = packet.Data;
+            planetsPackDownload.received++;
+            if (planetsPackDownload.received < planetsPackDownload.chunkCount)
+                return;
+
+            // 重组
+            int total = 0;
+            foreach (byte[] chunk in planetsPackDownload.chunks)
+                total += chunk.Length;
+            byte[] data = new byte[total];
+            int offset = 0;
+            foreach (byte[] chunk in planetsPackDownload.chunks)
+            {
+                Array.Copy(chunk, 0, data, offset, chunk.Length);
+                offset += chunk.Length;
+            }
+
+            // 校验哈希
+            if (PlanetsPackTool.ComputeHash(data) != planetsPackDownload.expectedHash)
+            {
+                Menu.loading.Close();
+                MsgDrawer.main.Log("Planets pack download failed: hash mismatch");
+                planetsPackDownload = null;
+                return;
+            }
+
+            // 存入 Custom Solar Systems\{PackName}
+            try
+            {
+                string dest = System.IO.Path.Combine(Application.dataPath, "Custom Solar Systems", planetsPackDownload.packName);
+                PlanetsPackTool.Unpack(data, dest);
+                localPlanetsPackHashes.Add(planetsPackDownload.expectedHash);
+                // 记录哈希到本地，下次连接无需重新下载
+                string recordFile = Main.main != null
+                    ? System.IO.Path.Combine(Main.main.ModFolder, ".PlanetsPackPersistent")
+                    : System.IO.Path.Combine(Application.persistentDataPath, "MultiplayerSFS_PlanetsPacks.txt");
+                System.IO.File.AppendAllText(recordFile, $"{planetsPackDownload.packName}={planetsPackDownload.expectedHash}\n");
+                Debug.Log($"Installed planets pack '{planetsPackDownload.packName}'.");
+            }
+            catch (Exception ex)
+            {
+                Menu.loading.Close();
+                MsgDrawer.main.Log($"Failed to install planets pack: {ex.Message}");
+                planetsPackDownload = null;
+                return;
+            }
+            planetsPackDownload = null;
+
+            // 通知服务器就绪并进入世界
+            SendPacket(new Packet_ClientReady());
+            LoadWorldScene();
         }
 
         public static void SendPacket(Packet packet, NetDeliveryMethod method = NetDeliveryMethod.ReliableOrdered)
@@ -612,7 +739,8 @@ namespace MultiplayerSFS.Mod
             Packet_UpdateWorldTime packet = msg.Read<Packet_UpdateWorldTime>();
             if (WorldTime.main != null)
             {
-                WorldTime.main.worldTime = world.WorldTime = packet.WorldTime;
+                world.WorldTime = Math.Max(world.WorldTime, packet.WorldTime);
+                WorldTime.main.worldTime = world.WorldTime;
             }
         }
         
@@ -629,7 +757,12 @@ namespace MultiplayerSFS.Mod
         static void OnPacket_SendChatMessage(NetIncomingMessage msg)
         {
             Packet_SendChatMessage packet = msg.Read<Packet_SendChatMessage>();
-            ChatWindow.AddMessage(new ChatMessage(packet.Message, packet.SenderId, packet.Color));
+            const int maxLen = 45;
+            for (int i = 0; i < packet.Message.Length; i += maxLen)
+            {
+                int len = Math.Min(maxLen, packet.Message.Length - i);
+                ChatWindow.AddMessage(new ChatMessage(packet.Message.Substring(i, len), packet.SenderId, packet.Color));
+            }
         }
 
         static void OnPacket_ShowToastMessage(NetIncomingMessage msg)

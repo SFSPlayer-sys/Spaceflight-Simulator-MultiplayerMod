@@ -38,7 +38,6 @@ namespace MultiplayerSFS.Mod
                 WorldTime.main.AccelerateTime();
                 return;
             }
-            
             // 停止当前加速
             if (IsTimeWarping)
             {
@@ -348,11 +347,11 @@ namespace MultiplayerSFS.Mod
             {
                 if (packet.TimeScale == 1f && packet.VoteId == -1)
                 {
-                    // 停止时间加速
+                    // 停止时间加速，恢复物理时间
                     IsTimeWarping = false;
                     CurrentTimeScale = 1f;
                     CurrentPhysicsWarp = false;
-                    ApplyTimeScale(1f, false);
+                    ApplyTimeScale(1f, true);
                     if (!string.IsNullOrEmpty(packet.StopperName))
                     {
                         MsgDrawer.main.Log($"{packet.StopperName} ended the time warp");
@@ -409,7 +408,7 @@ namespace MultiplayerSFS.Mod
             IsTimeWarping = false;
             CurrentTimeScale = 1f;
             CurrentPhysicsWarp = false;
-            ApplyTimeScale(1f, false);
+            ApplyTimeScale(1f, true);
             
             // 通知服务器
             ClientManager.SendPacket
@@ -451,10 +450,10 @@ namespace MultiplayerSFS.Mod
             
             CloseVoteWindow();
             
-            // 重置时间
+            // 重置时间，恢复物理时间
             if (WorldTime.main != null)
             {
-                WorldTime.main.SetState(1f, false, false);
+                WorldTime.main.SetState(1f, true, false);
             }
         }
 

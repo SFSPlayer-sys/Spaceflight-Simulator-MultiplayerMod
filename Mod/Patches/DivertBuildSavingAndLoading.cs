@@ -5,7 +5,6 @@ using SFS;
 using SFS.IO;
 using SFS.Builds;
 using SFS.WorldBase;
-using SFS.IO;
 
 namespace MultiplayerSFS.Mod.Patches
 {
