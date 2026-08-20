@@ -36,6 +36,10 @@ dotnet publish -c Release -f net6.0 -r linux-arm64 --self-contained true -p:Publ
 if %ERRORLEVEL% NEQ 0 goto :error
 dotnet publish -c Release -f net6.0 -r linux-arm --self-contained true -p:PublishSingleFile=true -p:DebugType=None -o "%RELEASE_DIR%\Server-Linux-ARM-SelfContained"
 if %ERRORLEVEL% NEQ 0 goto :error
+dotnet publish -c Release -f net6.0 -r osx-x64 --self-contained true -p:PublishSingleFile=true -p:DebugType=None -o "%RELEASE_DIR%\Server-macOS-x64-SelfContained"
+if %ERRORLEVEL% NEQ 0 goto :error
+dotnet publish -c Release -f net6.0 -r osx-arm64 --self-contained true -p:PublishSingleFile=true -p:DebugType=None -o "%RELEASE_DIR%\Server-macOS-ARM64-SelfContained"
+if %ERRORLEVEL% NEQ 0 goto :error
 goto :launch
 :launch
 set SFS_MODS_DIR=C:\Program Files (x86)\Steam\steamapps\common\Spaceflight Simulator\Spaceflight Simulator Game\Mods
@@ -48,7 +52,6 @@ timeout /t 2 >nul
 start "" "%SFS_EXE%"
 goto :end
 :error
-echo BUILD FAILED!
 exit /b 1
 :end
 pause
