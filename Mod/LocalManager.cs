@@ -67,7 +67,7 @@ namespace MultiplayerSFS.Mod
         /// <summary>
         /// The rate (in milliseconds) at which `UpdateRocket` packets will be sent to the server.
         /// </summary>
-        public static double updateRocketsPeriod = 10;
+        public static double updateRocketsPeriod = 5;
         static Timer updateTimer;
         /// <summary>
         /// `prevResourcePercents` is used to determine when `UpdatePart_ResourceModule` packets should be sent.

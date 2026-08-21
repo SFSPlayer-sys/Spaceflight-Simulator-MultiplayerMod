@@ -15,7 +15,7 @@ namespace MultiplayerSFS.Server
 {
     public static class CommandExtensions
     {
-        public static string FormatCommand(this string name, string args = null!)
+        public static string FormatCommand(this string name, string args = null)
         {
             string formatted = $"\"{CommandManager.CommandPrefix}{name}";
             if (args != null)

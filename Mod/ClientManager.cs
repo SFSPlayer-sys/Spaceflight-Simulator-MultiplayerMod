@@ -25,17 +25,8 @@ namespace MultiplayerSFS.Mod
         /// Id of the local player.
         /// </summary>
         public static int playerId;
-        /// <summary>
-        /// 是否允许占用发射台时发射
-        /// </summary>
         public static bool allowLaunchOnOccupiedPad;
-        /// <summary>
-        /// 本机所有星球包的 SHA256
-        /// </summary>
         static readonly List<string> localPlanetsPackHashes = new List<string>();
-        /// <summary>
-        /// 星球包下载状态
-        /// </summary>
         class PlanetsPackDownload
         {
             public string packName;
@@ -54,7 +45,6 @@ namespace MultiplayerSFS.Mod
         {
             if (client != null && client.Status != NetPeerStatus.NotRunning)
                 client.Shutdown("Re-attempting join request");
-
             NetPeerConfiguration npc = new NetPeerConfiguration("multiplayersfs")
             {
                 ConnectionTimeout = 5,
@@ -64,13 +54,9 @@ namespace MultiplayerSFS.Mod
 			npc.EnableMessageType(NetIncomingMessageType.VerboseDebugMessage);
             // TODO: ping readout UI?
 			// npc.EnableMessageType(NetIncomingMessageType.ConnectionLatencyUpdated);
-            
             client = new NetClient(npc);
             client.Start();
-
             NetOutgoingMessage hail = client.CreateMessage();
-            
-            // 检查本地是否有该星系包，并收集所有星球包的 SHA256
             string solarSystemName = "";
             localPlanetsPackHashes.Clear();
             try
@@ -121,8 +107,6 @@ namespace MultiplayerSFS.Mod
             {
                 Debug.LogWarning($"Failed to check local solar systems: {ex.Message}");
             }
-            
-            // 获取游戏版本
             string gameVersion = Application.version;
             Debug.Log($"Client game version: {gameVersion}");
             
@@ -131,7 +115,6 @@ namespace MultiplayerSFS.Mod
                 new Packet_JoinRequest()
                 {
                     Username = info.username,
-                    // 发送密码哈希
                     Password = Packet_JoinRequest.GetPasswordHash(info.password),
                     SolarSystemName = solarSystemName,
                     GameVersion = gameVersion,
@@ -484,6 +467,7 @@ namespace MultiplayerSFS.Mod
                         {
                             if (!string.IsNullOrWhiteSpace(reason) && reason.IndexOf("banned", StringComparison.OrdinalIgnoreCase) >= 0)
                                 ToastHelper.ShowToast("You have been banned from the server.");
+                            HostManager.OnStop();
                             SceneLoader.ExitToMainMenu();
                             client.Shutdown("Disconnected by server.");
                         }
@@ -774,24 +758,37 @@ namespace MultiplayerSFS.Mod
         static void OnPacket_UpdateCheatStatus(NetIncomingMessage msg)
         {
             Packet_UpdateCheatStatus packet = msg.Read<Packet_UpdateCheatStatus>();
-            
-            // 更新游戏的作弊设置
-            if (SFS.World.SandboxSettings.main != null)
-            {
-                SFS.World.SandboxSettings.main.settings.infiniteFuel = packet.InfiniteFuel;
-                SFS.World.SandboxSettings.main.settings.noAtmosphericDrag = packet.NoAtmosphericDrag;
-                SFS.World.SandboxSettings.main.settings.unbreakableParts = packet.UnbreakableParts;
-                SFS.World.SandboxSettings.main.settings.noGravity = packet.NoGravity;
-                SFS.World.SandboxSettings.main.settings.noHeatDamage = packet.NoHeatDamage;
-                SFS.World.SandboxSettings.main.settings.noBurnMarks = packet.NoBurnMarks;
-                SFS.World.SandboxSettings.main.settings.infiniteBuildArea = packet.InfiniteBuildArea;
-                SFS.World.SandboxSettings.main.settings.partClipping = packet.PartClipping;
-                
-                // 通知UI更新
-                SFS.World.SandboxSettings.main.UpdateUI(false);
-                
-                Debug.Log($"Cheat status updated: InfiniteFuel={packet.InfiniteFuel}, NoAtmosphericDrag={packet.NoAtmosphericDrag}");
-            }
+            lastCheatStatus = packet;
+            ApplyCheatStatus(packet);
+        }
+
+        static Packet_UpdateCheatStatus lastCheatStatus;
+        /// <summary>
+        /// 应用作弊设置，世界场景未加载时缓存待加载后应用
+        /// </summary>
+        static void ApplyCheatStatus(Packet_UpdateCheatStatus packet)
+        {
+            if (SFS.World.SandboxSettings.main == null)
+                return;
+            SFS.World.SandboxSettings.main.settings.infiniteFuel = packet.InfiniteFuel;
+            SFS.World.SandboxSettings.main.settings.noAtmosphericDrag = packet.NoAtmosphericDrag;
+            SFS.World.SandboxSettings.main.settings.unbreakableParts = packet.UnbreakableParts;
+            SFS.World.SandboxSettings.main.settings.noGravity = packet.NoGravity;
+            SFS.World.SandboxSettings.main.settings.noHeatDamage = packet.NoHeatDamage;
+            SFS.World.SandboxSettings.main.settings.noBurnMarks = packet.NoBurnMarks;
+            SFS.World.SandboxSettings.main.settings.infiniteBuildArea = packet.InfiniteBuildArea;
+            SFS.World.SandboxSettings.main.settings.partClipping = packet.PartClipping;
+            SFS.World.SandboxSettings.main.UpdateUI(false);
+            Debug.Log($"Cheat status updated: InfiniteFuel={packet.InfiniteFuel}, NoAtmosphericDrag={packet.NoAtmosphericDrag}");
+        }
+
+        /// <summary>
+        /// 世界场景加载后应用缓存的作弊设置
+        /// </summary>
+        public static void ApplyCachedCheatStatus()
+        {
+            if (lastCheatStatus != null)
+                ApplyCheatStatus(lastCheatStatus);
         }
 
         static void OnPacket_TimeWarpVote(NetIncomingMessage msg)

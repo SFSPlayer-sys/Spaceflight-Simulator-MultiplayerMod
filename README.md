@@ -62,7 +62,7 @@ A (WIP) multiplayer mod for the game Spaceflight Simulator.
 | | - `partclipping` – Allow part clipping |
 | | **Example:** `/cheat infinitefuel true` |
 | `/ban [IP/PLAYER] [time]` | Ban a player by name or IP address. `time` is in **hours** (optional; empty = permanent). |
-| | **Example:** `/ban 192.168.1.5 24` or `/ban Steve` |
+| | **Example:** `/ban 192.168.1.5 24` or `/ban PlayerName` |
 | `/unban [IP/PLAYER]` | Remove a ban for the given name or IP address. |
 | `/banlist` | List all currently banned players. |
 

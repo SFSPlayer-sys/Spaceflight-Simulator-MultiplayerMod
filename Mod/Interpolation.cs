@@ -89,33 +89,39 @@ namespace MultiplayerSFS.Mod
                 return;
             }
 
-            if (updateBuffer.Count < MinBufferForInterpolation)
+            // 暂停插值，直接用最新位置包设置状态
+            if (updateBuffer.Count > 0)
             {
-                if (updateBuffer.Count > 0)
-                {
-                    PredictState(currentUpdate);
-                }
+                currentUpdate = updateBuffer[updateBuffer.Count - 1];
+                updateBuffer.Clear();
+                SetState(currentUpdate.Location.ToVanillaLocation(), currentUpdate.Rotation, currentUpdate.AngularVelocity);
             }
-            else
-            {
-                while (updateBuffer.Count > 0)
-                {
-                    Packet_UpdateRocketPrimary prev = currentUpdate;
-                    Packet_UpdateRocketPrimary next = updateBuffer[0];
-
-                    if (DelayedWorldTime > next.WorldTime)
-                    {
-                        // * The current packet is now "out of date".
-                        currentUpdate = updateBuffer[0];
-                        updateBuffer.RemoveAt(0);
-                        continue;
-                    }
-                    
-                    // * The current packet is now "up to date" and the location of the rocket can be set via interpolation.
-                    InterpolatePackets(prev, next);
-                    break;
-                }
-            }
+            // TODO: 恢复插值
+            // if (updateBuffer.Count < MinBufferForInterpolation)
+            // {
+            //     if (updateBuffer.Count > 0)
+            //     {
+            //         PredictState(currentUpdate);
+            //     }
+            // }
+            // else
+            // {
+            //     while (updateBuffer.Count > 0)
+            //     {
+            //         Packet_UpdateRocketPrimary prev = currentUpdate;
+            //         Packet_UpdateRocketPrimary next = updateBuffer[0];
+            //
+            //         if (DelayedWorldTime > next.WorldTime)
+            //         {
+            //             currentUpdate = updateBuffer[0];
+            //             updateBuffer.RemoveAt(0);
+            //             continue;
+            //         }
+            //
+            //         InterpolatePackets(prev, next);
+            //         break;
+            //     }
+            // }
 
             // * Run and remove any packets that have passed their world time.
             packetBuffer.RemoveAll
@@ -127,7 +133,7 @@ namespace MultiplayerSFS.Mod
                         Debug.LogError($"Interpolator Error: WorldTime of `{tuple.packet.Type}` packet has not been set!");
                         return true;
                     }
-                    if (tuple.time >= DelayedWorldTime)
+                    if (tuple.time <= DelayedWorldTime)
                     {
                         RunPacket(tuple.packet);
                         return true;
@@ -139,7 +145,7 @@ namespace MultiplayerSFS.Mod
 
         void PredictState(Packet_UpdateRocketPrimary lastPacket)
         {
-            double dt = DelayedWorldTime - lastPacket.WorldTime;
+            double dt = System.Math.Min(DelayedWorldTime - lastPacket.WorldTime, 2 * LocalManager.updateRocketsPeriod / 1000.0);
             if (dt <= 0) return;
 
             Location loc = lastPacket.Location.ToVanillaLocation();
@@ -182,7 +188,7 @@ namespace MultiplayerSFS.Mod
                     break;
                     
                 case InterpolationMode.Spherical:
-                    // * 球面插值
+                    // * 球面插值（用于在星球表面移动）
                     SphericalInterpolation(prev, next, t, out loc, out rot, out angVel);
                     break;
                     
@@ -231,7 +237,7 @@ namespace MultiplayerSFS.Mod
             angVel = Mathf.Lerp(prev.AngularVelocity, next.AngularVelocity, (float) t);
         }
 
-        // 球面插值
+        // 球面插值（用于在星球表面移动）
         void SphericalInterpolation(Packet_UpdateRocketPrimary prev, Packet_UpdateRocketPrimary next, double t, out Location loc, out float rot, out float angVel)
         {
             loc = prev.Location.ToVanillaLocation();

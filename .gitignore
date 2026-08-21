@@ -6,3 +6,5 @@ Mod/obj
 Server/bin
 Server/obj
 Release/
+MasterServer/bin
+MasterServer/obj

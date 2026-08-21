@@ -20,9 +20,7 @@ namespace MultiplayerSFS.Server
 		public static ServerSettings settings;
 		public static WorldState world;
 		public static Dictionary<IPEndPoint, ConnectedPlayer> connectedPlayers;
-		/// <summary>
-		/// 服务器星球包（配置为空时未启用）
-		/// </summary>
+		public static bool isRunning = false;
 		public static byte[] planetsPackData;
 		public static string planetsPackName = "";
 		public static string planetsPackHash = "";
@@ -30,6 +28,7 @@ namespace MultiplayerSFS.Server
 		public static void Initialize(ServerSettings settings)
 		{
 			Server.settings = settings;
+			isRunning = true;
 			int port = settings.port;
 			while (true)
 			{
@@ -100,7 +99,7 @@ namespace MultiplayerSFS.Server
 			{
 				Logger.Info($"Multiplayer SFS server started, listening for connections on port {server.Port}...", true);
 				
-				while (true)
+				while (isRunning)
 				{
 					Listen();
 					ProcessSingleMessage(server.WaitMessage(10));
@@ -129,7 +128,13 @@ namespace MultiplayerSFS.Server
 			}
 		}
 
-        private static DateTime lastAuthorityUpdate = DateTime.MinValue;
+		public static void Stop()
+		{
+			isRunning = false;
+			server?.Shutdown("Server stopped");
+		}
+
+		private static DateTime lastAuthorityUpdate = DateTime.MinValue;
         private const int AuthorityUpdateIntervalMs = 200;
         
         private static DateTime lastWorldSave = DateTime.MinValue;
@@ -253,7 +258,7 @@ namespace MultiplayerSFS.Server
 			server.SendMessage(msg, connection, method);
 		}
 
-		public static void SendPacketToAll(Packet packet, NetConnection except = null!, NetDeliveryMethod method = NetDeliveryMethod.ReliableOrdered)
+		public static void SendPacketToAll(Packet packet, NetConnection except = null, NetDeliveryMethod method = NetDeliveryMethod.ReliableOrdered)
 		{
 			// Logger.Debug($"Sending packet of type '{packet.Type}' to all.");
 			NetOutgoingMessage msg = server.CreateMessage();

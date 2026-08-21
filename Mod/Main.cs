@@ -36,13 +36,19 @@ namespace MultiplayerSFS.Mod
         {
             SceneHelper.OnWorldSceneLoaded += (Action) delegate
             {
+                if (!ClientManager.multiplayerEnabled)
+                {
+                    HostPanel.CreateUI();
+                }
                 if (ClientManager.multiplayerEnabled)
                 {
+                    ClientManager.ApplyCachedCheatStatus();
                     ChatWindow.CreateUI("world");
                 }
             };
             SceneHelper.OnWorldSceneUnloaded += (Action) delegate
             {
+                HostPanel.DestroyUI();
                 if (ClientManager.multiplayerEnabled)
                 {
                     // * Send `UpdateControl` packet when the player leaves the world scene in multiplayer.

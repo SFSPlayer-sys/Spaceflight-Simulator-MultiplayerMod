@@ -10,6 +10,10 @@
   <ItemGroup>
     <PackageReference Include="Lidgren.Network" Version="1.0.2" />
     <Compile Include="../Common/*.cs" />
+    <Compile Include="../Server/Server.cs" />
+    <Compile Include="../Server/Commands.cs" />
+    <Compile Include="../Server/Settings.cs" />
+    <Compile Include="../Server/Logger.cs" />
 
     <Reference Include="C:\Program Files (x86)\Steam\steamapps\common\Spaceflight Simulator\Spaceflight Simulator Game\Spaceflight Simulator_Data\Managed/*">
       <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Spaceflight Simulator\Spaceflight Simulator Game\Spaceflight Simulator_Data\Managed\*.dll</HintPath>
