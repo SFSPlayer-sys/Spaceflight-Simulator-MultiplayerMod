@@ -161,6 +161,7 @@ namespace MultiplayerSFS.ServerCommon
         public string Password { get; set; }
         public string SolarSystemName { get; set; } = "";
         public string GameVersion { get; set; } = "";
+        public int ProtocolVersion { get; set; }
         /// <summary>
         /// 本机所有星球包的 SHA256
         /// </summary>
@@ -188,6 +189,7 @@ namespace MultiplayerSFS.ServerCommon
             msg.Write(Password);
             msg.Write(SolarSystemName);
             msg.Write(GameVersion);
+            msg.Write(ProtocolVersion);
             msg.WriteCollection(PlanetsPackHashes, msg.Write);
         }
         public override void Deserialize(NetIncomingMessage msg)
@@ -196,6 +198,7 @@ namespace MultiplayerSFS.ServerCommon
             Password = msg.ReadString();
             SolarSystemName = msg.ReadString();
             GameVersion = msg.ReadString();
+            ProtocolVersion = msg.ReadInt32();
             PlanetsPackHashes = msg.ReadCollection(count => new List<string>(count), msg.ReadString);
         }
     }

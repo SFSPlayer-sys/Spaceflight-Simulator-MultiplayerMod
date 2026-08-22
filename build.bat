@@ -40,7 +40,7 @@ dotnet publish -c Release -f net6.0 -r osx-x64 --self-contained true -p:PublishS
 if %ERRORLEVEL% NEQ 0 goto :error
 dotnet publish -c Release -f net6.0 -r osx-arm64 --self-contained true -p:PublishSingleFile=true -p:DebugType=None -o "%RELEASE_DIR%\Server-macOS-ARM64-SelfContained"
 if %ERRORLEVEL% NEQ 0 goto :error
-goto :launch
+goto :end
 :launch
 set SFS_MODS_DIR=C:\Program Files (x86)\Steam\steamapps\common\Spaceflight Simulator\Spaceflight Simulator Game\Mods
 if not exist "%SFS_MODS_DIR%" mkdir "%SFS_MODS_DIR%"

@@ -69,7 +69,7 @@ namespace MultiplayerSFS.Mod
 
             holder_window = Builder.CreateHolder(Builder.SceneToAttach.CurrentScene, "Multiplayer SFS - Chat Window Holder");
 
-            window = Builder.CreateWindow
+            window = Builder.CreateClosableWindow
             (
                 holder_window.transform,
                 windowID,
@@ -106,7 +106,7 @@ namespace MultiplayerSFS.Mod
             // * 2 * -60 for both the color picker and the chat input.
             RemainingHeight -= 60 + 60;
 
-            window_messages = Builder.CreateWindow
+            window_messages = Builder.CreateClosableWindow
             (
                 window,
                 Builder.GetRandomID(),

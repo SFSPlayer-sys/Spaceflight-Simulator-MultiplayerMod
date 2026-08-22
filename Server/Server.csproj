@@ -21,6 +21,7 @@
   <ItemGroup Condition="'$(TargetFramework)' == 'net6.0'">
     <Compile Include="../Common/PlanetsPackTool.cs" Link="PlanetsPackTool.cs" />
     <Compile Include="../Common/PacketDefs.cs" Link="PacketDefs.cs" />
+    <Compile Include="../Common/Ver.cs" Link="Ver.cs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Lidgren.Network" Version="1.0.2" />

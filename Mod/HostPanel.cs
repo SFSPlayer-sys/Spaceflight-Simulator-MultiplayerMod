@@ -24,7 +24,7 @@ namespace MultiplayerSFS.Mod
             joinInfo = new JoinInfo();
 
             holder_window = Builder.CreateHolder(Builder.SceneToAttach.CurrentScene, "Multiplayer SFS - Open to LAN");
-            window = Builder.CreateWindow
+            window = Builder.CreateClosableWindow
             (
                 holder_window.transform,
                 windowID,

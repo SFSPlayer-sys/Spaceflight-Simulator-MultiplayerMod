@@ -278,6 +278,7 @@ namespace MultiplayerSFS.Server
 			response.Write(settings.maxConnections);
 			response.Write(settings.allowedGameVersions);
 			response.Write(settings.serverPassword != "");
+			response.Write(Ver.ProtocolVersion);
 			server.SendDiscoveryResponse(response, msg.SenderEndPoint);
 		}
 
@@ -340,6 +341,11 @@ namespace MultiplayerSFS.Server
 			if (!IsVersionAllowed(request.GameVersion, out string versionReason))
 			{
 				reason = versionReason;
+				goto ConnectionDenied;
+			}
+			if (request.ProtocolVersion != Ver.ProtocolVersion)
+			{
+				reason = $"Protocol version mismatch (client {request.ProtocolVersion}, server {Ver.ProtocolVersion}). Please update the mod.";
 				goto ConnectionDenied;
 			}
 

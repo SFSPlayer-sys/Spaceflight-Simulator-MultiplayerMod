@@ -118,6 +118,7 @@ namespace MultiplayerSFS.Mod
                     Password = Packet_JoinRequest.GetPasswordHash(info.password),
                     SolarSystemName = solarSystemName,
                     GameVersion = gameVersion,
+                    ProtocolVersion = Ver.ProtocolVersion,
                     PlanetsPackHashes = localPlanetsPackHashes,
                 }
             );
@@ -191,6 +192,7 @@ namespace MultiplayerSFS.Mod
             public int maxPlayers;
             public string allowedVersions;
             public bool hasPassword;
+            public int protocolVersion;
             /// <summary>
             /// 是否为历史加入记录
             /// </summary>
@@ -319,6 +321,7 @@ namespace MultiplayerSFS.Mod
                             maxPlayers = msg.ReadInt32(),
                             allowedVersions = msg.ReadString(),
                             hasPassword = msg.ReadBoolean(),
+                            protocolVersion = msg.ReadInt32(),
                         });
                     }
                 }
@@ -355,6 +358,7 @@ namespace MultiplayerSFS.Mod
                             maxPlayers = msg.ReadInt32(),
                             allowedVersions = msg.ReadString(),
                             hasPassword = msg.ReadBoolean(),
+                            protocolVersion = msg.ReadInt32(),
                         };
                         infoClient.Shutdown("Query complete");
                         return info;
