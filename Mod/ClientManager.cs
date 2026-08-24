@@ -125,6 +125,16 @@ namespace MultiplayerSFS.Mod
             client.Connect(new IPEndPoint(info.address, info.port), hail);
 
             Menu.loading.Open("Waiting for server response...");
+            try
+            {
+                ServerInfo serverInfo = await GetServerInfo(new IPEndPoint(info.address, info.port));
+                if (serverInfo != null && serverInfo.protocolVersion != Ver.ProtocolVersion)
+                    MsgDrawer.main.Log("Client's network protocol version does not match. This may affect gameplay experience.");
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"Protocol check failed: {ex.Message}");
+            }
             string denialReason = "Connection timed out";
             while (true)
             {

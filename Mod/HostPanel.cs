@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UITools;
 using SFS.UI;
 using SFS.UI.ModGUI;
 using Type = SFS.UI.ModGUI.Type;
@@ -24,7 +25,7 @@ namespace MultiplayerSFS.Mod
             joinInfo = new JoinInfo();
 
             holder_window = Builder.CreateHolder(Builder.SceneToAttach.CurrentScene, "Multiplayer SFS - Open to LAN");
-            window = Builder.CreateClosableWindow
+            window = UIToolsBuilder.CreateClosableWindow
             (
                 holder_window.transform,
                 windowID,

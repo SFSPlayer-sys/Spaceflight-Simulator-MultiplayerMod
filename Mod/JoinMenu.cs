@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using UnityEngine;
+using UITools;
 using SFS.UI;
 using SFS.Input;
 using SFS.UI.ModGUI;
@@ -48,7 +49,7 @@ namespace MultiplayerSFS.Mod
                 ScreenManager.main.OpenScreen(() => this);
                 windowHolder.SetActive(true);
                 ClientManager.multiplayerEnabled.Value = true;
-                window = Builder.CreateClosableWindow
+                window = UIToolsBuilder.CreateClosableWindow
                 (
                     windowHolder.transform,
                     windowID,
@@ -218,7 +219,7 @@ namespace MultiplayerSFS.Mod
             if (serverListHolder == null)
             {
                 serverListHolder = Builder.CreateHolder(Builder.SceneToAttach.CurrentScene, "MultiplayerSFS - Server List");
-                serverListWindow = Builder.CreateClosableWindow
+                serverListWindow = UIToolsBuilder.CreateClosableWindow
                 (
                     serverListHolder.transform,
                     Builder.GetRandomID(),
@@ -232,7 +233,7 @@ namespace MultiplayerSFS.Mod
                     "Servers"
                 );
                 serverListWindow.CreateLayoutGroup(Type.Vertical, TextAnchor.UpperLeft, spacing: 3f, padding: new RectOffset(5, 5, 5, 5));
-                serverListRows = Builder.CreateClosableWindow
+                serverListRows = UIToolsBuilder.CreateClosableWindow
                 (
                     serverListWindow,
                     Builder.GetRandomID(),

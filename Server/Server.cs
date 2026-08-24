@@ -51,7 +51,6 @@ namespace MultiplayerSFS.Server
 				}
 				catch
 				{
-					// 端口占用时换下一个端口
 					port++;
 				}
 			}
@@ -72,7 +71,6 @@ namespace MultiplayerSFS.Server
 			connectedPlayers = new Dictionary<IPEndPoint, ConnectedPlayer>();
 			BanManager.Load();
 			lastWorldSave = DateTime.Now;
-
 			// 加载星球包
 			planetsPackData = null;
 			planetsPackName = "";
@@ -97,7 +95,7 @@ namespace MultiplayerSFS.Server
 		{
 			try
 			{
-				Logger.Info($"Multiplayer SFS server started, listening for connections on port {server.Port}...", true);
+				Logger.Info($"Multiplayer SFS server v{Ver.ServerVersion} started , listening for connections on port {server.Port}...", true);
 				
 				while (isRunning)
 				{
@@ -344,10 +342,7 @@ namespace MultiplayerSFS.Server
 				goto ConnectionDenied;
 			}
 			if (request.ProtocolVersion != Ver.ProtocolVersion)
-			{
-				reason = $"Protocol version mismatch (client {request.ProtocolVersion}, server {Ver.ProtocolVersion}). Please update the mod.";
-				goto ConnectionDenied;
-			}
+				Logger.Warning($"Client protocol version mismatch (client {request.ProtocolVersion}, server {Ver.ProtocolVersion}).");
 
 			Logger.Info($"Approved join request, sending world info...", true);
 			

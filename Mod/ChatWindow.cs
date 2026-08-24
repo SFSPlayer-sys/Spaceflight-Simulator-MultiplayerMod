@@ -4,6 +4,7 @@ using HarmonyLib;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using UITools;
 using SFS.UI;
 using SFS.UI.ModGUI;
 using MultiplayerSFS.Common;
@@ -69,7 +70,7 @@ namespace MultiplayerSFS.Mod
 
             holder_window = Builder.CreateHolder(Builder.SceneToAttach.CurrentScene, "Multiplayer SFS - Chat Window Holder");
 
-            window = Builder.CreateClosableWindow
+            window = UIToolsBuilder.CreateClosableWindow
             (
                 holder_window.transform,
                 windowID,
@@ -106,7 +107,7 @@ namespace MultiplayerSFS.Mod
             // * 2 * -60 for both the color picker and the chat input.
             RemainingHeight -= 60 + 60;
 
-            window_messages = Builder.CreateClosableWindow
+            window_messages = UIToolsBuilder.CreateClosableWindow
             (
                 window,
                 Builder.GetRandomID(),

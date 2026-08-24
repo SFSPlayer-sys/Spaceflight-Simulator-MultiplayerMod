@@ -4,7 +4,6 @@ using System.Timers;
 using System.Collections.Generic;
 using HarmonyLib;
 using UnityEngine;
-using SFS;
 using SFS.UI;
 using SFS.Parts;
 using SFS.World;
@@ -199,26 +198,31 @@ namespace MultiplayerSFS.Mod
                 }
                 else
                 {
-                    // 火箭已被销毁，清理残留数据
                     syncedRockets.Remove(id);
                     updateAuthority.Remove(id);
                 }
             }
         }
 
+        static Dictionary<Rocket, int> rocketToSyncedID = new Dictionary<Rocket, int>();
+        static Dictionary<Rocket, int> rocketToUnsyncedID = new Dictionary<Rocket, int>();
+
         /// <summary>
         /// Returns the id of the provided synced rocket, otherwise returns -1 if not found.
         /// </summary>
         public static int GetSyncedRocketID(Rocket rocket)
         {
-            try
-            {
-                return syncedRockets.First(kvp => kvp.Value.rocket == rocket).Key;
-            }
-            catch (InvalidOperationException)
-            {
+            if (rocket == null)
                 return -1;
+            if (rocketToSyncedID.TryGetValue(rocket, out int id) && syncedRockets.TryGetValue(id, out LocalRocket lr) && lr.rocket == rocket)
+                return id;
+            rocketToSyncedID.Clear();
+            foreach (KeyValuePair<int, LocalRocket> kvp in syncedRockets)
+            {
+                if (kvp.Value.rocket != null)
+                    rocketToSyncedID[kvp.Value.rocket] = kvp.Key;
             }
+            return rocketToSyncedID.TryGetValue(rocket, out id) ? id : -1;
         }
 
         /// <summary>
@@ -226,14 +230,17 @@ namespace MultiplayerSFS.Mod
         /// </summary>
         public static int GetUnsyncedRocketID(Rocket rocket)
         {
-            try
-            {
-                return unsyncedRockets.First(kvp => kvp.Value.rocket == rocket).Key;
-            }
-            catch (InvalidOperationException)
-            {
+            if (rocket == null)
                 return -1;
+            if (rocketToUnsyncedID.TryGetValue(rocket, out int id) && unsyncedRockets.TryGetValue(id, out LocalRocket lr) && lr.rocket == rocket)
+                return id;
+            rocketToUnsyncedID.Clear();
+            foreach (KeyValuePair<int, LocalRocket> kvp in unsyncedRockets)
+            {
+                if (kvp.Value.rocket != null)
+                    rocketToUnsyncedID[kvp.Value.rocket] = kvp.Key;
             }
+            return rocketToUnsyncedID.TryGetValue(rocket, out id) ? id : -1;
         }
 
         /// <summary>
@@ -241,14 +248,9 @@ namespace MultiplayerSFS.Mod
         /// </summary>
         public static int GetLocalPartID(int rocketId, Part part)
         {
-            try
-            {
-                return syncedRockets[rocketId].parts.First(kvp => kvp.Value == part).Key;
-            }
-            catch (InvalidOperationException)
-            {
-                return -1;
-            }
+            if (syncedRockets.TryGetValue(rocketId, out LocalRocket lr))
+                return lr.GetPartID(part);
+            return -1;
         }
 
         public static Packet_UpdateRocketPrimary ToUpdatePacketPrimary(this Rocket rocket, int id)
@@ -434,6 +436,7 @@ namespace MultiplayerSFS.Mod
         public Rocket rocket;
         public Dictionary<int, Part> parts;
         public Interpolator interpolator;
+        Dictionary<Part, int> partIDs = new Dictionary<Part, int>();
 
         public LocalRocket(Rocket rocket)
         {
@@ -483,16 +486,23 @@ namespace MultiplayerSFS.Mod
             };
         }
 
-        // TODO: It may be worth storing an inverse dictionary to make this more efficient.
         /// <summary>
-        /// Returns the id of a local part, or -1 if this rocket does not contain the provided part.
+        /// 性能优化，获取本地零件ID
         /// </summary>
         public int GetPartID(Part part)
         {
-            if (parts.FirstOrDefault(p => p.Value == part) is KeyValuePair<int, Part> kvp && kvp.Value != null)
-                return kvp.Key;
-            else
-                return -1;
+            if (partIDs.TryGetValue(part, out int id))
+                return id;
+            if (partIDs.Count != parts.Count)
+            {
+                partIDs.Clear();
+                foreach (KeyValuePair<int, Part> kvp in parts)
+                {
+                    partIDs[kvp.Value] = kvp.Key;
+                }
+                return partIDs.TryGetValue(part, out id) ? id : -1;
+            }
+            return -1;
         }
     }
 

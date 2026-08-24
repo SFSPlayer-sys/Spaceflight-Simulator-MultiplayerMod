@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Collections.Generic;
 using UnityEngine;
+using UITools;
 using SFS.UI;
 using ModGUI = SFS.UI.ModGUI;
 using SFS.World;
@@ -56,7 +57,7 @@ namespace MultiplayerSFS.Mod
                 return;
             
             var holder = ModGUI.Builder.CreateHolder(ModGUI.Builder.SceneToAttach.CurrentScene, "TimeWarp Selection");
-            voteWindow = ModGUI.Builder.CreateClosableWindow
+            voteWindow = UIToolsBuilder.CreateClosableWindow
             (
                 holder.transform,
                 ModGUI.Builder.GetRandomID(),
@@ -243,7 +244,7 @@ namespace MultiplayerSFS.Mod
                 return;
             
             var holder = ModGUI.Builder.CreateHolder(ModGUI.Builder.SceneToAttach.CurrentScene, "TimeWarp Vote");
-            voteWindow = ModGUI.Builder.CreateClosableWindow
+            voteWindow = UIToolsBuilder.CreateClosableWindow
             (
                 holder.transform,
                 ModGUI.Builder.GetRandomID(),
