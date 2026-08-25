@@ -323,9 +323,10 @@ namespace MultiplayerSFS.Mod
                 {
                     if (msg.MessageType == NetIncomingMessageType.DiscoveryResponse)
                     {
+                        int actualPort = msg.ReadInt32();
                         servers.Add(new ServerInfo()
                         {
-                            endpoint = msg.SenderEndPoint,
+                            endpoint = new IPEndPoint(msg.SenderEndPoint.Address, actualPort),
                             name = msg.ReadString(),
                             playerCount = msg.ReadInt32(),
                             maxPlayers = msg.ReadInt32(),
@@ -360,9 +361,10 @@ namespace MultiplayerSFS.Mod
                 {
                     if (msg.MessageType == NetIncomingMessageType.DiscoveryResponse && msg.SenderEndPoint.Equals(endpoint))
                     {
+                        int actualPort = msg.ReadInt32();
                         ServerInfo info = new ServerInfo()
                         {
-                            endpoint = msg.SenderEndPoint,
+                            endpoint = new IPEndPoint(msg.SenderEndPoint.Address, actualPort),
                             name = msg.ReadString(),
                             playerCount = msg.ReadInt32(),
                             maxPlayers = msg.ReadInt32(),

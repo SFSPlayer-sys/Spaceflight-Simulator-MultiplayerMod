@@ -274,6 +274,7 @@ namespace MultiplayerSFS.Server
 		static void OnDiscoveryRequest(NetIncomingMessage msg)
 		{
 			NetOutgoingMessage response = server.CreateMessage();
+			response.Write(server.Port);
 			response.Write(settings.serverName);
 			response.Write(connectedPlayers.Count);
 			response.Write(settings.maxConnections);
