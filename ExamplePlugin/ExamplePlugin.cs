@@ -45,16 +45,17 @@ namespace MultiplayerSFS.Plugins
                 return r;
             }
         }
-        // Stop command
-        class StopCommand : Command
-        {
-            public override string Description => "Stop the server";
-            public override string Run(string[] args, Lidgren.Network.NetConnection sender)
-            {
-                if (!CheckAdmin(sender)) return "Admin only";
-                ServerClass.Stop();
-                return "";
-            }
-        }
+        //It is dangerous 
+        // // Stop command
+        // class StopCommand : Command
+        // {
+        //     public override string Description => "Stop the server";
+        //     public override string Run(string[] args, Lidgren.Network.NetConnection sender)
+        //     {
+        //         if (!CheckAdmin(sender)) return "Admin only";
+        //         ServerClass.Stop();
+        //         return "";
+        //     }
+        // }
     }
 }

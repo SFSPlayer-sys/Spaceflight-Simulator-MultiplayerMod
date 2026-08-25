@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using HarmonyLib;
+using UnityEngine;
 using SFS.World;
 using SFS.WorldBase;
 
@@ -55,6 +56,20 @@ namespace MultiplayerSFS.Mod.Patches
                 {
                     __instance.settings.playtime.lastPlayedTime_Ticks = System.DateTime.Now.Ticks;
                     __instance.settings.playtime.totalPlayTime_Seconds += 10.0;
+                    return false;
+                }
+                return true;
+            }
+        }
+
+        [HarmonyPatch(typeof(GameManager), "CreateWorldSave")]
+        public class GameManager_CreateWorldSave
+        {
+            public static bool Prefix(ref WorldSave __result)
+            {
+                if (ClientManager.multiplayerEnabled.Value)
+                {
+                    __result = WorldSave.CreateEmptyQuicksave(Application.version);
                     return false;
                 }
                 return true;

@@ -4,6 +4,7 @@ using System.Timers;
 using System.Collections.Generic;
 using HarmonyLib;
 using UnityEngine;
+using SFS;
 using SFS.UI;
 using SFS.Parts;
 using SFS.World;
@@ -300,9 +301,8 @@ namespace MultiplayerSFS.Mod
             List<PartJoint> joints = new List<PartJoint>(state.joints.Count);
             foreach (JointState joint in state.joints)
             {
-                if (joint.id_A == -1 || joint.id_B == -1)
+                if (joint.id_A == -1 || joint.id_B == -1 || !parts.ContainsKey(joint.id_A) || !parts.ContainsKey(joint.id_B))
                 {
-                    // TODO: This is a temporary fix for an error caused by split modules (afaik).
                     continue;
                 }
                 Part part_A = parts[joint.id_A];
@@ -318,9 +318,28 @@ namespace MultiplayerSFS.Mod
 
             foreach (StageState stage in state.stages)
             {
-                List<Part> stageParts = stage.partIDs.Select(id => parts[id]).ToList();
+                List<Part> stageParts = stage.partIDs.Where(parts.ContainsKey).Select(id => parts[id]).ToList();
                 rocket.staging.InsertStage(new Stage(stage.stageID, stageParts), false);
             }
+            foreach (KeyValuePair<int, PartState> kvp in state.parts)
+            {
+                Part part = parts[kvp.Key];
+                if (kvp.Value.part.TOGGLE_VARIABLES.TryGetValue("engine_on", out bool engineOn))
+                {
+                    foreach (var engine in part.GetModules<EngineModule>())
+                    {
+                        engine.engineOn.Value = engineOn;
+                    }
+                }
+                if (kvp.Value.part.TOGGLE_VARIABLES.TryGetValue("wheel_on", out bool wheelOn))
+                {
+                    foreach (var wheel in part.GetModules<WheelModule>())
+                    {
+                        wheel.on.Value = wheelOn;
+                    }
+                }
+            }
+
             return new LocalRocket(rocket, parts);
         }
 
@@ -348,6 +367,8 @@ namespace MultiplayerSFS.Mod
 
         public static Location ToVanillaLocation(this NetLocation loc)
         {
+            if (string.IsNullOrEmpty(loc.address))
+                return new Location(Base.planetLoader.spaceCenter.Planet, loc.position, loc.velocity);
             return new Location(loc.address.GetPlanet(), loc.position, loc.velocity);
         }
 

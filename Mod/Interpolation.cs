@@ -60,9 +60,8 @@ namespace MultiplayerSFS.Mod
 
         void Update()
         {
-            if (currentUpdate == null)
+            if (currentUpdate == null || rocket?.rocket == null)
             {
-                // * This interpolator hasn't recieved any packets yet.
                 return;
             }
 
@@ -88,38 +87,33 @@ namespace MultiplayerSFS.Mod
                 }
                 return;
             }
-            if (updateBuffer.Count > 0)
+            if (updateBuffer.Count < MinBufferForInterpolation)
             {
-                currentUpdate = updateBuffer[updateBuffer.Count - 1];
-                updateBuffer.Clear();
-                SetState(currentUpdate.Location.ToVanillaLocation(), currentUpdate.Rotation, currentUpdate.AngularVelocity);
+                PredictState(currentUpdate);
+                if (updateBuffer.Count > 0)
+                {
+                    currentUpdate = updateBuffer[updateBuffer.Count - 1];
+                    updateBuffer.Clear();
+                }
             }
-            // TODO: 恢复插值
-            // if (updateBuffer.Count < MinBufferForInterpolation)
-            // {
-            //     if (updateBuffer.Count > 0)
-            //     {
-            //         PredictState(currentUpdate);
-            //     }
-            // }
-            // else
-            // {
-            //     while (updateBuffer.Count > 0)
-            //     {
-            //         Packet_UpdateRocketPrimary prev = currentUpdate;
-            //         Packet_UpdateRocketPrimary next = updateBuffer[0];
-            //
-            //         if (DelayedWorldTime > next.WorldTime)
-            //         {
-            //             currentUpdate = updateBuffer[0];
-            //             updateBuffer.RemoveAt(0);
-            //             continue;
-            //         }
-            //
-            //         InterpolatePackets(prev, next);
-            //         break;
-            //     }
-            // }
+            else
+            {
+                while (updateBuffer.Count > 0)
+                {
+                    Packet_UpdateRocketPrimary prev = currentUpdate;
+                    Packet_UpdateRocketPrimary next = updateBuffer[0];
+
+                    if (DelayedWorldTime > next.WorldTime)
+                    {
+                        currentUpdate = updateBuffer[0];
+                        updateBuffer.RemoveAt(0);
+                        continue;
+                    }
+
+                    InterpolatePackets(prev, next);
+                    break;
+                }
+            }
 
             // * Run and remove any packets that have passed their world time.
             packetBuffer.RemoveAll
@@ -333,6 +327,22 @@ namespace MultiplayerSFS.Mod
             arrowkeys.rcs.Value = packet.RCS;
             rocket.rocket.throttle.throttlePercent.Value = packet.ThrottlePercent;
             rocket.rocket.throttle.throttleOn.Value = packet.ThrottleOn;
+            if (ClientManager.world.rockets.TryGetValue(packet.RocketId, out RocketState state))
+            {
+                foreach (KeyValuePair<int, PartState> kvp in state.parts)
+                {
+                    if (kvp.Value.part.TOGGLE_VARIABLES.TryGetValue("engine_on", out bool engineOn))
+                    {
+                        if (rocket.parts.TryGetValue(kvp.Key, out Part part))
+                        {
+                            foreach (EngineModule engine in part.GetModules<EngineModule>())
+                            {
+                                engine.engineOn.Value = engineOn;
+                            }
+                        }
+                    }
+                }
+            }
 
         }
 

@@ -1,4 +1,10 @@
+using System;
 using Lidgren.Network;
+#if NET48
+using MultiplayerSFS.Common;
+#else
+using MultiplayerSFS.ServerCommon;
+#endif
 namespace MultiplayerSFS.Server
 {
     public static class Plugin
@@ -8,11 +14,8 @@ namespace MultiplayerSFS.Server
         public static event Action<ConnectedPlayer, string> OnChatMessage;
         public static event Func<NetConnection, string, bool> OnMessageHandled;
         public static event Action<string, object> OnAnyEvent;
-        //数据包接收：返回 true 阻止默认处理
         public static event Func<NetConnection, PacketType, NetIncomingMessage, bool> OnPacketReceived;
-        //数据包发送时触发（null connection = 广播给所有人）
-        public static event Action<NetConnection?, Packet> OnPacketSent;
-        //收到未处理的包类型时触发
+        public static event Action<NetConnection, Packet> OnPacketSent;
         public static event Action<PacketType, NetConnection> OnUnhandledPacket;
 
         internal static void TriggerEvent(string eventName, object data) => OnAnyEvent?.Invoke(eventName, data);
@@ -37,7 +40,7 @@ namespace MultiplayerSFS.Server
             }
             return false;
         }
-        internal static void TriggerPacketSent(NetConnection? connection, Packet packet)
+        internal static void TriggerPacketSent(NetConnection connection, Packet packet)
         {
             OnPacketSent?.Invoke(connection, packet);
         }
