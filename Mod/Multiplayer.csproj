@@ -14,6 +14,9 @@
     <Compile Include="../Server/Commands.cs" />
     <Compile Include="../Server/Settings.cs" />
     <Compile Include="../Server/Logger.cs" />
+    <Compile Include="../Server/Plugin.cs" />
+    <Compile Include="../Server/IPlugin.cs" />
+    <Compile Include="../Server/PluginManager.cs" />
 
     <Reference Include="C:\Program Files (x86)\Steam\steamapps\common\Spaceflight Simulator\Spaceflight Simulator Game\Spaceflight Simulator_Data\Managed/*">
       <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Spaceflight Simulator\Spaceflight Simulator Game\Spaceflight Simulator_Data\Managed\*.dll</HintPath>

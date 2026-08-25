@@ -39,7 +39,9 @@ namespace MultiplayerSFS.Server
 					settings = ServerSettings.Deserialize(File.ReadAllText(CONFIG_FILENAME));
 				}
 				Server.Initialize(settings);
+				PluginManager.LoadPlugins();
 				Server.Run();
+				PluginManager.UnloadPlugins();
 			}
 			catch (Exception e)
 			{

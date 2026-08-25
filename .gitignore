@@ -8,3 +8,5 @@ Server/obj
 Release/
 MasterServer/bin
 MasterServer/obj
+ExamplePlugin/bin
+ExamplePlugin/obj

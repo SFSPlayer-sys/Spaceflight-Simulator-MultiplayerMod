@@ -96,6 +96,7 @@ namespace MultiplayerSFS.Server
 			try
 			{
 				Logger.Info($"Multiplayer SFS server v{Ver.ServerVersion} started , listening for connections on port {server.Port}...", true);
+				Plugin.TriggerEvent("ServerStarted", null);
 				
 				while (isRunning)
 				{
@@ -119,6 +120,7 @@ namespace MultiplayerSFS.Server
 						lastBanCleanup = DateTime.Now;
 					}
 				}
+				Plugin.TriggerEvent("ServerStopped", null);
 			}
 			catch (Exception e)
 			{
@@ -190,6 +192,7 @@ namespace MultiplayerSFS.Server
 			bool requiresRefresh = false;
 			while ((msg = server.ReadMessage()) != null)
 			{
+				Plugin.TriggerEvent(msg.MessageType.ToString(), msg);
 				switch (msg.MessageType)
 				{
 					case NetIncomingMessageType.StatusChanged:
@@ -248,7 +251,7 @@ namespace MultiplayerSFS.Server
 			}
 			ConnectedPlayer player = FindPlayer(connection);
 			if (player != null && BanManager.IsBannedQuick(player.username, connection.RemoteEndPoint))
-				return; // 被 ban 的连接不发送数据包
+				return; 
 			// Logger.Debug($"Sending packet of type '{packet.Type}'.");
 			NetOutgoingMessage msg = server.CreateMessage();
 			msg.Write((byte) packet.Type);
@@ -437,6 +440,7 @@ namespace MultiplayerSFS.Server
 				connection
 			);
 			// 世界数据等客户端就绪（ClientReady）后发送
+			Plugin.TriggerPlayerJoined(player);
 		}
 
 		static void SendWorldDataToPlayer(NetConnection connection)
@@ -557,6 +561,7 @@ namespace MultiplayerSFS.Server
             if (FindPlayer(connection) is ConnectedPlayer player)
 			{
 				SendPacketToAll(new Packet_PlayerDisconnected() { PlayerId = player.id });
+				Plugin.TriggerPlayerLeft(player);
 				connectedPlayers.Remove(connection.RemoteEndPoint);
 				UpdatePlayerAuthorities();
 			}
@@ -664,6 +669,7 @@ namespace MultiplayerSFS.Server
         static bool OnIncomingPacket(NetIncomingMessage msg)
         {
             PacketType packetType = (PacketType) msg.ReadByte();
+			Plugin.TriggerEvent("Packet_" + packetType, msg);
 			// if (Packet.ShouldDebug(packetType))
 			// 	Logger.Debug($"Recieved packet of type '{packetType}'.");
 			switch (packetType)
@@ -788,21 +794,30 @@ namespace MultiplayerSFS.Server
 		static void OnPacket_SendChatMessage(NetIncomingMessage msg)
         {
             Packet_SendChatMessage packet = msg.Read<Packet_SendChatMessage>();
+			// 插件可拦截处理消息
+			if (Plugin.TryHandleMessage(msg.SenderConnection, packet.Message))
+				return;
 			if (CommandManager.TryParse(packet.Message, out string name, out string[] args))
 			{
 				string message = CommandManager.TryRun(name, args, msg.SenderConnection);
-				SendPacketToPlayer
-				(
-					msg.SenderConnection,
-					new Packet_SendChatMessage()
-					{
-						Message = message,
-					}
-				);
+				foreach (string line in message.Split('\n'))
+				{
+					if (line.Length == 0) continue;
+					SendPacketToPlayer
+					(
+						msg.SenderConnection,
+						new Packet_SendChatMessage()
+						{
+							Message = line.TrimEnd('\r'),
+						}
+					);
+				}
 			}
 			else
 			{
 				SendPacketToAll(packet, msg.SenderConnection);
+				if (FindPlayer(msg.SenderConnection) is ConnectedPlayer sender)
+					Plugin.TriggerChatMessage(sender, packet.Message);
 			}
         }
 
@@ -1001,9 +1016,6 @@ namespace MultiplayerSFS.Server
 			isTimeWarping = false;
 			currentTimeScale = 1f;
 			currentPhysicsWarp = false;
-			world.timeWarpScale = 1.0;
-			
-			// 广播给所有玩家停止时间加速
 			SendPacketToAll(new Packet_TimeWarpResult()
 			{
 				VoteId = -1,
@@ -1016,26 +1028,18 @@ namespace MultiplayerSFS.Server
 			Logger.Info($"Time warp stopped by {requester.username}");
 			return;
 		}
-
-		// 投票中则忽略新请求
 		if (isVoting)
 		{
 			Logger.Info($"Vote already in progress, ignoring request from {requester.username}");
 			return;
 		}
-
-		// 开始新投票
 		currentVoteId++;
 		isVoting = true;
 		requestedTimeScale = packet.TimeScale;
 		requesterName = packet.RequesterName;
 		requestedPhysicsWarp = packet.PhysicsWarp;
 		currentVotes.Clear();
-		
-		// 计算投票人数
 		totalVoters = connectedPlayers.Values.Count(p => p.controlledRocket >= 0);
-		
-		// 仅一人控制时直接通过
 		if (totalVoters <= 1)
 		{
 			isVoting = false;
@@ -1052,11 +1056,9 @@ namespace MultiplayerSFS.Server
 				PhysicsWarp = requestedPhysicsWarp,
 			});
 			
-			Logger.Info($"Time warp to {requestedTimeScale}x approved (single player, {(requestedPhysicsWarp ? "Physics" : "WorldTime")})");
+			Logger.Info($"Time warp to {requestedTimeScale}x approved ({(requestedPhysicsWarp ? "Physics" : "WorldTime")})");
 			return;
 		}
-
-		// 向其他控制火箭的玩家发送投票请求
 		foreach (KeyValuePair<IPEndPoint, ConnectedPlayer> kvp in connectedPlayers)
 		{
 			if (kvp.Value.id != requester.id && kvp.Value.controlledRocket >= 0)
@@ -1081,13 +1083,8 @@ namespace MultiplayerSFS.Server
 		
 		if (voter == null || !isVoting || packet.VoteId != currentVoteId)
 			return;
-
-		// 记录投票
 		currentVotes[voter.id] = packet.Agreed;
-		
 		Logger.Info($"{voter.username} voted: {(packet.Agreed ? "Agree" : "Reject")}");
-
-		// 有人拒绝时广播
 		if (!packet.Agreed)
 		{
 			isVoting = false;
