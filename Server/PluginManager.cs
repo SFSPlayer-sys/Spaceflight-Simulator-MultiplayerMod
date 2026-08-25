@@ -30,20 +30,26 @@ namespace MultiplayerSFS.Server
                     foreach (Type type in asm.GetTypes())
                     {
                         if (!type.IsClass || type.IsAbstract || !typeof(IPlugin).IsAssignableFrom(type)) continue;
-                        IPlugin plugin = (IPlugin)Activator.CreateInstance(type);
-                        pluginName = plugin.Name;
-                        pluginVersion = plugin.Version;
-                        if (Version.TryParse(plugin.MinimumServerVersion, out Version min) && Version.TryParse(Ver.ServerVersion, out Version cur) && min > cur)
-                            throw new Exception($"requires server version {min}, current {cur}");
-                        plugin.OnLoad();
-                        plugins.Add(plugin);
-                        Logger.Info($"Successfully loaded plugin: {pluginName} ({pluginVersion})", true);
-                        break;
+                        try
+                        {
+                            IPlugin plugin = (IPlugin)Activator.CreateInstance(type);
+                            pluginName = plugin.Name;
+                            pluginVersion = plugin.Version;
+                            if (Version.TryParse(plugin.MinimumServerVersion, out Version min) && Version.TryParse(Ver.ServerVersion, out Version cur) && min > cur)
+                                throw new Exception($"requires server version {min}, current {cur}");
+                            plugin.OnLoad();
+                            plugins.Add(plugin);
+                            Logger.Info($"Successfully loaded plugin: {pluginName} ({pluginVersion})", true);
+                        }
+                        catch (Exception e)
+                        {
+                            Logger.Error($"Failed to load plugin: {pluginName} ({pluginVersion}) : {e.Message}");
+                        }
                     }
                 }
                 catch (Exception e)
                 {
-                    Logger.Error($"Failed to load plugin: {pluginName} ({pluginVersion}) : {e.Message}");
+                    Logger.Error($"Failed to load assembly: {pluginName} : {e.Message}");
                 }
             }
         }

@@ -53,7 +53,7 @@ namespace MultiplayerSFS.Plugins
             {
                 if (!CheckAdmin(sender)) return "Admin only";
                 ServerClass.Stop();
-                return "Server stopping...";
+                return "";
             }
         }
     }

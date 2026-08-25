@@ -252,7 +252,7 @@ namespace MultiplayerSFS.Server
 			ConnectedPlayer player = FindPlayer(connection);
 			if (player != null && BanManager.IsBannedQuick(player.username, connection.RemoteEndPoint))
 				return; 
-			// Logger.Debug($"Sending packet of type '{packet.Type}'.");
+			Plugin.TriggerPacketSent(connection, packet);
 			NetOutgoingMessage msg = server.CreateMessage();
 			msg.Write((byte) packet.Type);
 			msg.Write(packet);
@@ -261,7 +261,7 @@ namespace MultiplayerSFS.Server
 
 		public static void SendPacketToAll(Packet packet, NetConnection except = null, NetDeliveryMethod method = NetDeliveryMethod.ReliableOrdered)
 		{
-			// Logger.Debug($"Sending packet of type '{packet.Type}' to all.");
+			Plugin.TriggerPacketSent(null, packet);
 			NetOutgoingMessage msg = server.CreateMessage();
 			msg.Write((byte) packet.Type);
 			msg.Write(packet);
@@ -670,8 +670,8 @@ namespace MultiplayerSFS.Server
         {
             PacketType packetType = (PacketType) msg.ReadByte();
 			Plugin.TriggerEvent("Packet_" + packetType, msg);
-			// if (Packet.ShouldDebug(packetType))
-			// 	Logger.Debug($"Recieved packet of type '{packetType}'.");
+			if (Plugin.TryHandlePacketReceived(msg.SenderConnection, packetType, msg))
+				return false;
 			switch (packetType)
 			{
 				case PacketType.UpdatePlayerControl:
@@ -749,6 +749,7 @@ namespace MultiplayerSFS.Server
 					return false;
 
 				default:
+					Plugin.TriggerUnhandledPacket(packetType, msg.SenderConnection);
 					Logger.Error($"Unhandled packet type: {packetType}, {msg.LengthBytes} bytes.");
 					return false;
 			}
