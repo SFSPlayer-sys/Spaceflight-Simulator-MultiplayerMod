@@ -107,7 +107,7 @@ namespace MultiplayerSFS.Mod
             // * 2 * -60 for both the color picker and the chat input.
             RemainingHeight -= 60 + 60;
 
-            window_messages = UIToolsBuilder.CreateClosableWindow
+            window_messages = Builder.CreateWindow
             (
                 window,
                 Builder.GetRandomID(),
@@ -436,7 +436,6 @@ namespace MultiplayerSFS.Mod
 
     public static class ToastHelper
     {
-        // 显示Toast消息
         public static string ShowToast(string toast)
         {
             string msg = toast;
@@ -449,7 +448,7 @@ namespace MultiplayerSFS.Mod
                 MsgDrawer.main.Log(msg, false);
                 return "Success";
             }
-            return "Error: MsgDrawer not available";
+            return "";
         }
     }
 }

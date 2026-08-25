@@ -49,7 +49,7 @@ namespace MultiplayerSFS.Mod
                 ScreenManager.main.OpenScreen(() => this);
                 windowHolder.SetActive(true);
                 ClientManager.multiplayerEnabled.Value = true;
-                window = UIToolsBuilder.CreateClosableWindow
+                window = Builder.CreateWindow
                 (
                     windowHolder.transform,
                     windowID,
@@ -233,7 +233,7 @@ namespace MultiplayerSFS.Mod
                     "Servers"
                 );
                 serverListWindow.CreateLayoutGroup(Type.Vertical, TextAnchor.UpperLeft, spacing: 3f, padding: new RectOffset(5, 5, 5, 5));
-                serverListRows = UIToolsBuilder.CreateClosableWindow
+                serverListRows = Builder.CreateWindow
                 (
                     serverListWindow,
                     Builder.GetRandomID(),

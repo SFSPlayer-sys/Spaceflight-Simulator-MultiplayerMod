@@ -88,8 +88,6 @@ namespace MultiplayerSFS.Mod
                 }
                 return;
             }
-
-            // 暂停插值，直接用最新位置包设置状态
             if (updateBuffer.Count > 0)
             {
                 currentUpdate = updateBuffer[updateBuffer.Count - 1];
@@ -169,7 +167,7 @@ namespace MultiplayerSFS.Mod
 
             double dt = DelayedWorldTime - prev.WorldTime;
             double t = dt / (next.WorldTime - prev.WorldTime);
-            t = System.Math.Clamp(t, 0, 1); // 确保t在[0,1]范围内
+            t = System.Math.Clamp(t, 0, 1);
 
             Location loc = prev.Location.ToVanillaLocation();
             float rot, angVel;
@@ -188,7 +186,7 @@ namespace MultiplayerSFS.Mod
                     break;
                     
                 case InterpolationMode.Spherical:
-                    // * 球面插值（用于在星球表面移动）
+                    // * 球面插值
                     SphericalInterpolation(prev, next, t, out loc, out rot, out angVel);
                     break;
                     
