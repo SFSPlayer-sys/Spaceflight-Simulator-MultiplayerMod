@@ -67,8 +67,17 @@ A (WIP) multiplayer mod for the game Spaceflight Simulator.
 | `/banlist` | List all currently banned players. |
 
 
-
-
-
 Based On
 This mod is based on the repository MultiplayerSFS (GitHub - AstroTheRabbit/Multiplayer-SFS) by Astro The Rabbit.
+
+
+# How to make a plugin?
+
+## There isn’t much to say here, but you can refer to the ExamplePlugin in the repository for guidance.
+
+## Note1: 
+If you need to send UI to the client, the icons can be filled with the following values:
+
+```Text
+newRocket, save, load, exit, resume, exit_Resume, settings, moveRocket, clear, videoTutorials, exampleRockets, shareRocket, cheats, revert, recover, destroy, collectRock, removeFlag.
+```
