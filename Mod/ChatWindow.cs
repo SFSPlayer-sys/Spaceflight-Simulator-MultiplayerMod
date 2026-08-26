@@ -194,6 +194,8 @@ namespace MultiplayerSFS.Mod
         {
             if (!string.IsNullOrEmpty(message) && canSendMessage)
             {
+                //防玩家发GUI
+                message = message.Replace("#UI_START#", "").Replace("#UI_END#", "");
                 AddMessage(new ChatMessage(message, ClientManager.playerId));
                 if (cooldownTimer != null)
                 {
