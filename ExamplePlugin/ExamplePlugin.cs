@@ -58,7 +58,7 @@ namespace MultiplayerSFS.Plugins
             return ServerClass.server.GetConnection(kvp.Key);
         }
 
-        // Player list
+        //Player list
         class PlayerListCommand : Command
         {
             public override string Description => "List online players and their online time";

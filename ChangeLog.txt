@@ -43,13 +43,13 @@ v0.4.2
 对局域网开放新增设置项
 支持插件与示例插件项目
 服务器发消息每行单独发
-修复Trajectory.xxx崩溃
-修复SpawnLocalRocket中joint/partID可能不存在导致的崩溃
-修复ToVanillaLocation为空时崩溃
+修复Trajectory.xxx导致崩溃的问题
+修复SpawnLocalRocket中joint/partID不存在导致崩溃的问题
+修复ToVanillaLocation为空时导致崩溃的问题
 修复引擎状态不同步
 恢复了火箭插值
 修复玩家存档对局域网开放加入游戏用的是指定端口而非实际端口
 服务器GUI支持
 新增指令：清楚碎片
 调整Servers列表位置
-Server所有方法改为pubilc
+Server所有方法改为public
