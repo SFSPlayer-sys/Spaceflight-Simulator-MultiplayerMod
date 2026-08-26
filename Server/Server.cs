@@ -101,6 +101,7 @@ namespace MultiplayerSFS.Server
 				
 				while (isRunning)
 				{
+					PluginManager.TriggerTick();
 					Listen();
 					ProcessSingleMessage(server.WaitMessage(10));
 					
@@ -147,7 +148,7 @@ namespace MultiplayerSFS.Server
 		/// <summary>
 		/// Processes a single incoming message
 		/// </summary>
-		static void ProcessSingleMessage(NetIncomingMessage msg)
+		public static void ProcessSingleMessage(NetIncomingMessage msg)
 		{
 			if (msg == null) return; // WaitMessage 超时返回 null
 			switch (msg.MessageType)
@@ -187,7 +188,7 @@ namespace MultiplayerSFS.Server
 		/// <summary>
 		/// Returns `true` if a refresh of the players' update authorities is required.
 		/// </summary>
-		static bool Listen()
+		public static bool Listen()
 		{
 			NetIncomingMessage msg;
 			bool requiresRefresh = false;
@@ -238,7 +239,50 @@ namespace MultiplayerSFS.Server
 			return null;
 		}
 
-		static string FormatUsername(this string username)
+		public static ConnectedPlayer FindPlayerByName(string username)
+		{
+			foreach (KeyValuePair<IPEndPoint, ConnectedPlayer> kvp in connectedPlayers)
+			{
+				if (string.Equals(kvp.Value.username, username, StringComparison.OrdinalIgnoreCase))
+					return kvp.Value;
+			}
+			return null;
+		}
+
+		public static NetConnection FindConnectionByName(string username)
+		{
+			if (FindPlayerByName(username) is ConnectedPlayer player)
+			{
+				foreach (KeyValuePair<IPEndPoint, ConnectedPlayer> kvp in connectedPlayers)
+				{
+					if (kvp.Value == player)
+						return server.GetConnection(kvp.Key);
+				}
+			}
+			return null;
+		}
+
+		public static void SetPlayerUsername(ConnectedPlayer player, string username)
+		{
+			if (player != null)
+				player.username = username;
+		}
+
+		public static void SetPlayerColor(ConnectedPlayer player, Color color)
+		{
+			if (player != null)
+				player.iconColor = color;
+		}
+
+		public static void KickPlayer(NetConnection connection, string reason = null)
+		{
+			if (connection == null)
+				return;
+			OnPlayerDisconnect(connection);
+			connection.Disconnect(reason ?? "Kicked by server");
+		}
+
+		public static string FormatUsername(this string username)
 		{
             return string.IsNullOrWhiteSpace(username) ? "???" : $"'{username}'";
         }
@@ -314,7 +358,7 @@ namespace MultiplayerSFS.Server
 			return new List<string>();
 		}
 
-		static string ExtractPanelId(string json)
+		public static string ExtractPanelId(string json)
 		{
 			const string marker = "\"id\"";
 			int idx = json.IndexOf(marker, StringComparison.Ordinal);
@@ -335,7 +379,7 @@ namespace MultiplayerSFS.Server
 		/// <summary>
 		/// 响应局域网发现请求
 		/// </summary>
-		static void OnDiscoveryRequest(NetIncomingMessage msg)
+		public static void OnDiscoveryRequest(NetIncomingMessage msg)
 		{
 			NetOutgoingMessage response = server.CreateMessage();
 			response.Write(server.Port);
@@ -351,7 +395,7 @@ namespace MultiplayerSFS.Server
 		/// <summary>
 		/// Returns `true` if a refresh of the players' update authorities is required.
 		/// </summary>
-		static bool OnStatusChanged(NetIncomingMessage msg)
+		public static bool OnStatusChanged(NetIncomingMessage msg)
 		{
 			NetConnectionStatus status = (NetConnectionStatus) msg.ReadByte();
 			string reason = msg.ReadString();
@@ -371,7 +415,7 @@ namespace MultiplayerSFS.Server
 			}
 		}
 
-        static void OnPlayerConnectionAttempt(NetIncomingMessage msg)
+        public static void OnPlayerConnectionAttempt(NetIncomingMessage msg)
 		{
 			Packet_JoinRequest request = msg.SenderConnection.RemoteHailMessage.Read<Packet_JoinRequest>();
             NetConnection connection = msg.SenderConnection;
@@ -442,7 +486,7 @@ namespace MultiplayerSFS.Server
 				connection.Deny(reason);
 		}
 
-		static bool IsVersionAllowed(string clientVersion, out string reason)
+		public static bool IsVersionAllowed(string clientVersion, out string reason)
 		{
 			reason = "";
 			if (string.IsNullOrWhiteSpace(settings.allowedGameVersions))
@@ -473,7 +517,7 @@ namespace MultiplayerSFS.Server
 			return false;
 		}
 
-		static void OnPlayerSuccessfulConnect(NetConnection connection)
+		public static void OnPlayerSuccessfulConnect(NetConnection connection)
 		{
 			ConnectedPlayer player = FindPlayer(connection);
 			if (player == null)
@@ -497,7 +541,7 @@ namespace MultiplayerSFS.Server
 			Plugin.TriggerPlayerJoined(player);
 		}
 
-		static void SendWorldDataToPlayer(NetConnection connection)
+		public static void SendWorldDataToPlayer(NetConnection connection)
 		{
 			ConnectedPlayer player = FindPlayer(connection);
 			if (player == null)
@@ -610,7 +654,7 @@ namespace MultiplayerSFS.Server
 			}
 		}
 
-		static void OnPlayerDisconnect(NetConnection connection)
+		public static void OnPlayerDisconnect(NetConnection connection)
         {
             if (FindPlayer(connection) is ConnectedPlayer player)
 			{
@@ -622,7 +666,7 @@ namespace MultiplayerSFS.Server
 			}
         }
 		
-		static void OnLatencyUpdated(NetIncomingMessage msg)
+		public static void OnLatencyUpdated(NetIncomingMessage msg)
 		{
 			if (FindPlayer(msg.SenderConnection) is ConnectedPlayer player)
 			{
@@ -642,7 +686,7 @@ namespace MultiplayerSFS.Server
 		}
 
 
-		static void UpdatePlayerAuthorities()
+		public static void UpdatePlayerAuthorities()
 		{
 			if (connectedPlayers.Count == 0)
 			{
@@ -721,7 +765,7 @@ namespace MultiplayerSFS.Server
 		/// <summary>
 		/// Returns `true` if a refresh of the players' update authorities is required.
 		/// </summary>
-        static bool OnIncomingPacket(NetIncomingMessage msg)
+        public static bool OnIncomingPacket(NetIncomingMessage msg)
         {
             PacketType packetType = (PacketType) msg.ReadByte();
 			Plugin.TriggerEvent("Packet_" + packetType, msg);
@@ -810,7 +854,7 @@ namespace MultiplayerSFS.Server
 			}
         }
 
-		static void OnPacket_UpdatePlayerControl(NetIncomingMessage msg)
+		public static void OnPacket_UpdatePlayerControl(NetIncomingMessage msg)
 		{
 			Packet_UpdatePlayerControl packet = msg.Read<Packet_UpdatePlayerControl>();
 			if (FindPlayer(msg.SenderConnection) is ConnectedPlayer player)
@@ -837,7 +881,7 @@ namespace MultiplayerSFS.Server
 			}
 		}
 
-		static void OnPacket_UpdatePlayerColor(NetIncomingMessage msg)
+		public static void OnPacket_UpdatePlayerColor(NetIncomingMessage msg)
         {
             Packet_UpdatePlayerColor packet = msg.Read<Packet_UpdatePlayerColor>();
 			if (FindPlayer(msg.SenderConnection) is ConnectedPlayer player)
@@ -847,10 +891,11 @@ namespace MultiplayerSFS.Server
             }
         }
 
-		static void OnPacket_SendChatMessage(NetIncomingMessage msg)
+		public static void OnPacket_SendChatMessage(NetIncomingMessage msg)
         {
             Packet_SendChatMessage packet = msg.Read<Packet_SendChatMessage>();
-			// 插件可拦截处理消息
+			if (Plugin.TryHandlePanelReply(msg.SenderConnection, packet.Message))
+				return;
 			if (Plugin.TryHandleMessage(msg.SenderConnection, packet.Message))
 				return;
 			if (CommandManager.TryParse(packet.Message, out string name, out string[] args))
@@ -877,7 +922,7 @@ namespace MultiplayerSFS.Server
 			}
         }
 
-		static bool OnPacket_CreateRocket(NetIncomingMessage msg)
+		public static bool OnPacket_CreateRocket(NetIncomingMessage msg)
 		{
 			Packet_CreateRocket packet = msg.Read<Packet_CreateRocket>();
 			if (world.rockets.ContainsKey(packet.GlobalId))
@@ -899,7 +944,7 @@ namespace MultiplayerSFS.Server
 
 		}
 
-		static void OnPacket_DestroyRocket(NetIncomingMessage msg)
+		public static void OnPacket_DestroyRocket(NetIncomingMessage msg)
 		{
 			Packet_DestroyRocket packet = msg.Read<Packet_DestroyRocket>();
 			if (world.rockets.Remove(packet.RocketId))
@@ -908,7 +953,7 @@ namespace MultiplayerSFS.Server
             }
 		}
 
-		static void OnPacket_UpdateRocketPrimary(NetIncomingMessage msg)
+		public static void OnPacket_UpdateRocketPrimary(NetIncomingMessage msg)
 		{
 			Packet_UpdateRocketPrimary packet = msg.Read<Packet_UpdateRocketPrimary>();
 			if (world.rockets.TryGetValue(packet.RocketId, out RocketState state))
@@ -918,7 +963,7 @@ namespace MultiplayerSFS.Server
 			}
 		}
 
-		static void OnPacket_UpdateRocketSecondary(NetIncomingMessage msg)
+		public static void OnPacket_UpdateRocketSecondary(NetIncomingMessage msg)
 		{
 			Packet_UpdateRocketSecondary packet = msg.Read<Packet_UpdateRocketSecondary>();
 			if (world.rockets.TryGetValue(packet.RocketId, out RocketState state))
@@ -928,7 +973,7 @@ namespace MultiplayerSFS.Server
 			}
 		}
 
-		static void OnPacket_DestroyPart(NetIncomingMessage msg)
+		public static void OnPacket_DestroyPart(NetIncomingMessage msg)
 		{
 			Packet_DestroyPart packet = msg.Read<Packet_DestroyPart>();
 			if (world.rockets.TryGetValue(packet.RocketId, out RocketState state))
@@ -938,7 +983,7 @@ namespace MultiplayerSFS.Server
 			}
 		}
 
-		static void OnPacket_UpdateStaging(NetIncomingMessage msg)
+		public static void OnPacket_UpdateStaging(NetIncomingMessage msg)
 		{
 			Packet_UpdateStaging packet = msg.Read<Packet_UpdateStaging>();
 			if (world.rockets.TryGetValue(packet.RocketId, out RocketState state))
@@ -948,7 +993,7 @@ namespace MultiplayerSFS.Server
 			}
 		}
 
-		static void OnPacket_UpdatePart_EngineModule(NetIncomingMessage msg)
+		public static void OnPacket_UpdatePart_EngineModule(NetIncomingMessage msg)
 		{
 			Packet_UpdatePart_EngineModule packet = msg.Read<Packet_UpdatePart_EngineModule>();
 			if (world.rockets.TryGetValue(packet.RocketId, out RocketState state))
@@ -961,7 +1006,7 @@ namespace MultiplayerSFS.Server
 			}
 		}
 
-		static void OnPacket_UpdatePart_WheelModule(NetIncomingMessage msg)
+		public static void OnPacket_UpdatePart_WheelModule(NetIncomingMessage msg)
 		{
 			Packet_UpdatePart_WheelModule packet = msg.Read<Packet_UpdatePart_WheelModule>();
 			if (world.rockets.TryGetValue(packet.RocketId, out RocketState state))
@@ -974,7 +1019,7 @@ namespace MultiplayerSFS.Server
 			}
 		}
 
-		static void OnPacket_UpdatePart_BoosterModule(NetIncomingMessage msg)
+		public static void OnPacket_UpdatePart_BoosterModule(NetIncomingMessage msg)
 		{
 			Packet_UpdatePart_BoosterModule packet = msg.Read<Packet_UpdatePart_BoosterModule>();
 			if (world.rockets.TryGetValue(packet.RocketId, out RocketState state))
@@ -991,7 +1036,7 @@ namespace MultiplayerSFS.Server
 			}
 		}
 
-		static void OnPacket_UpdatePart_ParachuteModule(NetIncomingMessage msg)
+		public static void OnPacket_UpdatePart_ParachuteModule(NetIncomingMessage msg)
 		{
 			Packet_UpdatePart_ParachuteModule packet = msg.Read<Packet_UpdatePart_ParachuteModule>();
 			if (world.rockets.TryGetValue(packet.RocketId, out RocketState state))
@@ -1005,7 +1050,7 @@ namespace MultiplayerSFS.Server
 			}
 		}
 
-		static void OnPacket_UpdatePart_MoveModule(NetIncomingMessage msg)
+		public static void OnPacket_UpdatePart_MoveModule(NetIncomingMessage msg)
 		{
 			Packet_UpdatePart_MoveModule packet = msg.Read<Packet_UpdatePart_MoveModule>();
 			if (world.rockets.TryGetValue(packet.RocketId, out RocketState state))
@@ -1019,7 +1064,7 @@ namespace MultiplayerSFS.Server
 			}
 		}
 
-		static void OnPacket_UpdatePart_ResourceModule(NetIncomingMessage msg)
+		public static void OnPacket_UpdatePart_ResourceModule(NetIncomingMessage msg)
 		{
 			Packet_UpdatePart_ResourceModule packet = msg.Read<Packet_UpdatePart_ResourceModule>();
 			if (world.rockets.TryGetValue(packet.RocketId, out RocketState state))
@@ -1054,7 +1099,7 @@ namespace MultiplayerSFS.Server
 	private static string requesterName = "";
 	private static bool requestedPhysicsWarp = false;
 
-		static void OnPacket_TimeWarpRequest(NetIncomingMessage msg)
+		public static void OnPacket_TimeWarpRequest(NetIncomingMessage msg)
 		{
 			Packet_TimeWarpRequest packet = msg.Read<Packet_TimeWarpRequest>();
 			ConnectedPlayer requester = FindPlayer(msg.SenderConnection);
@@ -1132,7 +1177,7 @@ namespace MultiplayerSFS.Server
 		Logger.Info($"Time warp vote started: {requesterName} requests {requestedTimeScale}x ({(requestedPhysicsWarp ? "Physics" : "WorldTime")}, {totalVoters} voters)");
 	}
 
-	static void OnPacket_TimeWarpVoteResponse(NetIncomingMessage msg)
+	public static void OnPacket_TimeWarpVoteResponse(NetIncomingMessage msg)
 	{
 		Packet_TimeWarpVoteResponse packet = msg.Read<Packet_TimeWarpVoteResponse>();
 		ConnectedPlayer voter = FindPlayer(msg.SenderConnection);
@@ -1209,7 +1254,7 @@ namespace MultiplayerSFS.Server
 		}
 	}
 	// * Planets Pack Sync
-	static void OnPacket_PlanetsPackRequest(NetIncomingMessage msg)
+	public static void OnPacket_PlanetsPackRequest(NetIncomingMessage msg)
 	{
 		Packet_PlanetsPackRequest packet = msg.Read<Packet_PlanetsPackRequest>();
 		ConnectedPlayer player = FindPlayer(msg.SenderConnection);
@@ -1234,7 +1279,7 @@ namespace MultiplayerSFS.Server
 		Logger.Info($"Sent planets pack '{planetsPackName}' to {player.username} ({chunkCount} chunks).", true);
 	}
 
-	static void OnPacket_ClientReady(NetIncomingMessage msg)
+	public static void OnPacket_ClientReady(NetIncomingMessage msg)
 	{
 		msg.Read<Packet_ClientReady>();
 		ConnectedPlayer player = FindPlayer(msg.SenderConnection);
@@ -1264,7 +1309,7 @@ namespace MultiplayerSFS.Server
 		public bool ready;
 
 		static readonly System.Random colorRandom = new System.Random();
-		static Color GetRandomColor()
+		public static Color GetRandomColor()
 		{
 			return Color.HSVToRGB(colorRandom.Next(0, 101) / 100f, 1, 1);
 		}
@@ -1468,7 +1513,7 @@ namespace MultiplayerSFS.Server
 		/// <summary>
 		/// 将秒数格式化为 天/小时/分钟
 		/// </summary>
-		static string FormatRemaining(long seconds)
+		public static string FormatRemaining(long seconds)
 		{
 			long days = seconds / 86400; seconds %= 86400;
 			long hours = seconds / 3600; seconds %= 3600;

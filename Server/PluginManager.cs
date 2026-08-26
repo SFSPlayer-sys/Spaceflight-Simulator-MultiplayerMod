@@ -5,6 +5,7 @@ using System.Collections.Generic;
 #if NET48
 using UnityEngine;
 #endif
+//插件管理器
 namespace MultiplayerSFS.Server
 {
     public static class PluginManager
@@ -17,7 +18,6 @@ namespace MultiplayerSFS.Server
             if (!Directory.Exists(dir))
             {
                 Directory.CreateDirectory(dir);
-                Logger.Info($"Plugin directory created: {dir}", true);
                 return;
             }
             foreach (string file in Directory.GetFiles(dir, "*.dll"))
@@ -69,6 +69,14 @@ namespace MultiplayerSFS.Server
 #else
             return Path.Combine(AppContext.BaseDirectory, "plugins");
 #endif
+        }
+        public static void TriggerTick()
+        {
+            foreach (IPlugin plugin in plugins)
+            {
+                try { plugin.OnTick(); }
+                catch (Exception e) { Logger.Error($"Error in plugin tick: {plugin.Name} ({plugin.Version}) : {e.Message}"); }
+            }
         }
     }
 }

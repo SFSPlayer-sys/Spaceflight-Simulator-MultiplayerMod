@@ -10,5 +10,6 @@ namespace MultiplayerSFS.Server
         string MinimumServerVersion { get; }
         void OnLoad();
         void OnUnload();
+        void OnTick();
     }
 }

@@ -52,3 +52,4 @@ v0.4.2
 服务器GUI支持
 新增指令：清楚碎片
 调整Servers列表位置
+Server所有方法改为pubilc

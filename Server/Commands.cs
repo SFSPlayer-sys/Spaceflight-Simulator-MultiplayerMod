@@ -601,7 +601,7 @@ namespace MultiplayerSFS.Server
         public override string Description => $@"
         |Controls cheat settings for players. This command requires admin privileges.
         |{"cheat".FormatCommand("<cheat> <value>")}:
-        |  <cheat>: The cheat to modify (e.g., infinitefuel)
+        |  <cheat>: The cheat to modify
         |  <value>: true or false to enable or disable the cheat
         |Example: {"cheat".FormatCommand("infinitefuel true")}
         ".CleanDescription();
@@ -654,8 +654,7 @@ namespace MultiplayerSFS.Server
                 default:
                     return $"Unknown cheat: {cheatName}";
             }
-
-            // 发送作弊状态更新给所有玩家
+            //发送作弊状态更新给所有玩家
             Server.SendPacketToAll(new Packet_UpdateCheatStatus()
             {
                 InfiniteFuel = Server.world.infiniteFuel,

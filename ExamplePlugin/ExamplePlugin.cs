@@ -33,34 +33,22 @@ namespace MultiplayerSFS.Plugins
                 ServerClass.SendPanel(conn, "{\"id\":\"upload_panel\",\"scene\":\"world\",\"title\":\"Upload\",\"width\":300,\"height\":150,\"closable\":true,\"elements\":[{\"type\":\"text_input\",\"placeholder\":\"Enter text\",\"width\":260,\"height\":40,\"action\":\"upload\"},{\"type\":\"button\",\"text\":\"Upload\",\"width\":260,\"height\":40,\"action\":\"upload\"}]}");
             };
             Plugin.OnPlayerLeft += player => joinTimes.Remove(player);
-            Plugin.OnMessageHandled += (conn, msg) =>
+            Plugin.OnPanelReply += (conn, panelId, action, value) =>
             {
-                const string start = "#UI_REPLY_START#";
-                const string end = "#UI_REPLY_END#";
-                int si = msg.IndexOf(start, StringComparison.Ordinal);
-                int ei = msg.IndexOf(end, StringComparison.Ordinal);
-                if (si < 0 || ei < 0) return false;
-                string json = msg.Substring(si + start.Length, ei - si - start.Length).Trim();
-                if (json.Contains("\"action\":\"upload\""))
-                {
-                    ConnectedPlayer p = ServerClass.FindPlayer(conn);
-                    string val = "";
-                    int vi = json.IndexOf("\"value\":\"", StringComparison.Ordinal);
-                    if (vi >= 0)
-                    {
-                        vi += 9;
-                        int ve = json.IndexOf('"', vi);
-                        if (ve > vi) val = json.Substring(vi, ve - vi);
-                    }
-                    Logger.Info($"{p?.username ?? "?"}: {val}");
-                    return true;
-                }
-                return false;
+                if (panelId != "upload_panel" || action != "upload")
+                    return false;
+                ConnectedPlayer p = ServerClass.FindPlayer(conn);
+                Logger.Info($"{p?.username ?? "?"}: {value}");
+                return true;
             };
         }
         public void OnUnload()
         {
             // Called when the plugin unloads
+        }
+        public void OnTick()
+        {
+            // Called every server tick
         }
 
         static NetConnection FindConnection(ConnectedPlayer player)

@@ -226,7 +226,7 @@ namespace MultiplayerSFS.Mod
                     950,
                     500,
                     0,
-                    600,
+                    1000,
                     true,
                     true,
                     0.95f,
