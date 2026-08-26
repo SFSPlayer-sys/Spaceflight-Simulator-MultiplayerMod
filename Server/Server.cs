@@ -141,7 +141,7 @@ namespace MultiplayerSFS.Server
         private static DateTime lastWorldSave = DateTime.MinValue;
         
         private static DateTime lastBanCleanup = DateTime.MinValue;
-        private static HashSet<int> controlledRocketsCache = new HashSet<int>();
+        internal static HashSet<int> controlledRocketsCache = new HashSet<int>();
         private static Dictionary<int, Double2> playerPositionsCache = new Dictionary<int, Double2>();
 
 		/// <summary>

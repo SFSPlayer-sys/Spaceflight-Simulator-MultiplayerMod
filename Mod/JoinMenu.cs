@@ -209,13 +209,13 @@ namespace MultiplayerSFS.Mod
         }
 
         /// <summary>
-        /// 显示服务器列表（历史 + 扫描），窗口只建一次，仅更新数据行
+        /// 显示服务器列表，窗口只建一次，仅更新数据行
         /// </summary>
         static void ShowServerList(List<ClientManager.ServerInfo> servers)
         {
             lastScannedServers = servers;
-
-            // 首次创建窗口与表头
+            HashSet<IPEndPoint> seen = new HashSet<IPEndPoint>();
+            servers = servers.Where(s => seen.Add(s.endpoint)).ToList();
             if (serverListHolder == null)
             {
                 serverListHolder = Builder.CreateHolder(Builder.SceneToAttach.CurrentScene, "MultiplayerSFS - Server List");
@@ -226,7 +226,7 @@ namespace MultiplayerSFS.Mod
                     950,
                     500,
                     0,
-                    0,
+                    600,
                     true,
                     true,
                     0.95f,
@@ -243,8 +243,6 @@ namespace MultiplayerSFS.Mod
                 );
                 serverListRows.CreateLayoutGroup(Type.Vertical, TextAnchor.UpperLeft, spacing: 3f, padding: new RectOffset(5, 5, 5, 5));
                 serverListRows.EnableScrolling(Type.Vertical);
-
-                // 表头放在行窗口内，与数据行共享同一布局容器
                 Container header = Builder.CreateContainer(serverListRows);
                 header.CreateLayoutGroup(Type.Horizontal, TextAnchor.MiddleLeft, spacing: 3f);
                 CreateColumnLabel(header, 160, "IP Address");
@@ -255,12 +253,9 @@ namespace MultiplayerSFS.Mod
                 Builder.CreateLabel(header, 90, 24, text: "");
                 Builder.CreateLabel(header, 60, 24, text: "");
             }
-
-            // 清空旧行（保留第一个子对象：表头）
             while (serverListRows.ChildrenHolder.transform.childCount > 1)
                 UnityEngine.Object.DestroyImmediate(serverListRows.ChildrenHolder.transform.GetChild(1).gameObject);
 
-            // 合并历史记录与扫描结果
             List<ClientManager.ServerInfo> history = new List<ClientManager.ServerInfo>(ClientManager.serverHistory);
             List<ClientManager.ServerInfo> all = new List<ClientManager.ServerInfo>();
             foreach (ClientManager.ServerInfo scanned in servers)
@@ -282,8 +277,6 @@ namespace MultiplayerSFS.Mod
             all.InsertRange(0, history);
             foreach (ClientManager.ServerInfo offline in history)
                 QueryHistoryServer(offline);
-
-            // 填充新行
             foreach (ClientManager.ServerInfo server in all)
             {
                 Container row = Builder.CreateContainer(serverListRows);
@@ -316,12 +309,10 @@ namespace MultiplayerSFS.Mod
                 }
                 else
                 {
-                    // 用空标签占位
                     Builder.CreateLabel(row, 60, 24, text: "");
                 }
             }
         }
-
         /// <summary>
         /// 向历史服务器定向询问信息并更新显示
         /// </summary>
@@ -331,7 +322,6 @@ namespace MultiplayerSFS.Mod
                 return;
             server.lastQueried = Time.unscaledTime;
             ClientManager.ServerInfo info = await ClientManager.GetServerInfo(server.endpoint);
-            // 菜单已关闭或无响应时不做处理
             if (info == null || serverListHolder == null)
                 return;
             server.name = string.IsNullOrWhiteSpace(info.name) ? server.name : info.name;
@@ -341,7 +331,6 @@ namespace MultiplayerSFS.Mod
             server.hasPassword = info.hasPassword;
             ShowServerList(lastScannedServers);
         }
-
         /// <summary>
         /// 创建表格列标签
         /// </summary>

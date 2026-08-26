@@ -63,6 +63,7 @@ namespace MultiplayerSFS.Server
                 { "list", new ListCommand() },
                 { "admin", new AdminCommand() },
                 { "destroy", new DestroyCommand() },
+                { "cleardebris", new ClearDebrisCommand() },
                 { "stats", new StatsCommand() },
                 { "broadcast", new BroadcastCommand() },
                 { "cheat", new CheatCommand() },
@@ -333,6 +334,45 @@ namespace MultiplayerSFS.Server
                 }
             }
             return count;
+        }
+    }
+
+    public class ClearDebrisCommand : Command
+    {
+        public override string Description => $@"
+        |Clears all space debris (uncontrolled rockets). This command requires admin privileges.
+        |{"cleardebris".FormatCommand()}: Destroys all rockets that no player is controlling.
+        ".CleanDescription();
+
+        public override string Run(string[] args, NetConnection sender)
+        {
+            if (!CheckAdmin(sender))
+            {
+                return "You do not have the required admin privileges to use this command.";
+            }
+            if (args.Length > 0)
+            {
+                return "Too many arguments provided.";
+            }
+            // 不在 controlledRocketsCache 中的火箭即碎片
+            int count = 0;
+            foreach (int id in Server.world.rockets.Keys.ToList())
+            {
+                if (Server.controlledRocketsCache.Contains(id))
+                    continue;
+                if (Server.world.rockets.Remove(id))
+                {
+                    Server.SendPacketToAll
+                    (
+                        new Packet_DestroyRocket()
+                        {
+                            RocketId = id,
+                        }
+                    );
+                    count++;
+                }
+            }
+            return $"Cleared {count} debris.";
         }
     }
 

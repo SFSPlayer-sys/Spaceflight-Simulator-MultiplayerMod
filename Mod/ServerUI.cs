@@ -239,7 +239,6 @@ namespace MultiplayerSFS.Mod
 
             Builder.CreateButton(parent, width, height, onClick: () => SendReply(panelId, action, panelInputs.TryGetValue(panelId, out string v) ? v : null), text: text);
         }
-
         static void CreateTextInput(GUIElement parent, string panelId, JObject el)
         {
             string placeholder = (string)el["placeholder"] ?? "";
