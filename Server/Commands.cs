@@ -452,14 +452,12 @@ namespace MultiplayerSFS.Server
                     // If there are remaining arguments, they are either player name or part of the message
                     // Check if the first remaining argument is a valid player
                     string potentialPlayer = remainingArgs[0];
-                    bool playerFound = false;
                     foreach (var connectedPlayer in Server.connectedPlayers.Values)
                     {
                         if (connectedPlayer.username.Equals(potentialPlayer, StringComparison.OrdinalIgnoreCase))
                         {
                             player = potentialPlayer;
                             remainingArgs.RemoveAt(0);
-                            playerFound = true;
                             break;
                         }
                     }

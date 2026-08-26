@@ -481,6 +481,7 @@ namespace MultiplayerSFS.Mod
                         string reason = msg.ReadString();
                         if (status == NetConnectionStatus.Disconnected)
                         {
+                            ServerUI.ClearAll();
                             if (!string.IsNullOrWhiteSpace(reason) && reason.IndexOf("banned", StringComparison.OrdinalIgnoreCase) >= 0)
                                 ToastHelper.ShowToast("You have been banned from the server.");
                             HostManager.OnStop();
@@ -757,6 +758,8 @@ namespace MultiplayerSFS.Mod
         static void OnPacket_SendChatMessage(NetIncomingMessage msg)
         {
             Packet_SendChatMessage packet = msg.Read<Packet_SendChatMessage>();
+            if (packet.Message != null && ServerUI.HandleMessage(packet.Message))
+                return;
             const int maxLen = 45;
             for (int i = 0; i < packet.Message.Length; i += maxLen)
             {

@@ -24,6 +24,7 @@ namespace MultiplayerSFS.Server
 		public static byte[] planetsPackData;
 		public static string planetsPackName = "";
 		public static string planetsPackHash = "";
+		static Dictionary<IPEndPoint, List<string>> playerOpenPanels = new Dictionary<IPEndPoint, List<string>>();
 
 		public static void Initialize(ServerSettings settings)
 		{
@@ -269,6 +270,69 @@ namespace MultiplayerSFS.Server
 		}
 
 		/// <summary>
+		/// 发送UI面板给玩家
+		/// </summary>
+		public static void SendPanel(NetConnection connection, string panelJson)
+		{
+			if (connection == null || FindPlayer(connection) == null)
+				return;
+			string panelId = ExtractPanelId(panelJson);
+			if (!playerOpenPanels.TryGetValue(connection.RemoteEndPoint, out List<string> ids))
+			{
+				ids = new List<string>();
+				playerOpenPanels[connection.RemoteEndPoint] = ids;
+			}
+			if (!ids.Contains(panelId))
+				ids.Add(panelId);
+			SendPacketToPlayer(connection, new Packet_SendChatMessage()
+			{
+				SenderId = -1,
+				Message = "#UI_START#\n" + panelJson + "\n#UI_END#",
+				Color = new Color(1, 1, 1, 1),
+			});
+		}
+		public static void ClosePanel(NetConnection connection, string panelId)
+		{
+			if (connection == null)
+				return;
+			if (playerOpenPanels.TryGetValue(connection.RemoteEndPoint, out List<string> ids))
+				ids.Remove(panelId);
+			SendPacketToPlayer(connection, new Packet_SendChatMessage()
+			{
+				SenderId = -1,
+				Message = "#UI_START#\n{\"id\":\"" + panelId + "\",\"close\":true}\n#UI_END#",
+				Color = new Color(1, 1, 1, 1),
+			});
+		}
+		/// <summary>
+		/// 获取玩家已打开的面板ID列表
+		/// </summary>
+		public static List<string> GetPlayerPanels(NetConnection connection)
+		{
+			if (connection != null && playerOpenPanels.TryGetValue(connection.RemoteEndPoint, out List<string> ids))
+				return new List<string>(ids);
+			return new List<string>();
+		}
+
+		static string ExtractPanelId(string json)
+		{
+			const string marker = "\"id\"";
+			int idx = json.IndexOf(marker, StringComparison.Ordinal);
+			if (idx < 0)
+				return "server_panel";
+			int colon = json.IndexOf(':', idx + marker.Length);
+			if (colon < 0)
+				return "server_panel";
+			int start = json.IndexOf('"', colon + 1);
+			if (start < 0)
+				return "server_panel";
+			int end = json.IndexOf('"', start + 1);
+			if (end < 0)
+				return "server_panel";
+			return json.Substring(start + 1, end - start - 1);
+		}
+
+		/// <summary>
 		/// 响应局域网发现请求
 		/// </summary>
 		static void OnDiscoveryRequest(NetIncomingMessage msg)
@@ -339,7 +403,6 @@ namespace MultiplayerSFS.Server
 				reason = $"Invalid password";
 				goto ConnectionDenied;
 			}
-			// 版本校验
 			if (!IsVersionAllowed(request.GameVersion, out string versionReason))
 			{
 				reason = versionReason;
@@ -382,34 +445,24 @@ namespace MultiplayerSFS.Server
 		static bool IsVersionAllowed(string clientVersion, out string reason)
 		{
 			reason = "";
-			
-			// 配置为空时允许所有版本
 			if (string.IsNullOrWhiteSpace(settings.allowedGameVersions))
 			{
 				return true;
 			}
-
-			// 客户端未发送版本信息时拒绝连接
 			if (string.IsNullOrWhiteSpace(clientVersion))
 			{
 				reason = "Client version not provided";
 				return false;
 			}
-
-			// 解析允许的版本列表
 			string[] allowedVersions = settings.allowedGameVersions.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
 			
 			foreach (string allowedVersion in allowedVersions)
 			{
 				string trimmedVersion = allowedVersion.Trim();
-				
-				// 完全匹配
 				if (clientVersion == trimmedVersion)
 				{
 					return true;
 				}
-
-				// 前缀匹配
 				if (clientVersion.StartsWith(trimmedVersion + "."))
 				{
 					return true;
@@ -564,6 +617,7 @@ namespace MultiplayerSFS.Server
 				SendPacketToAll(new Packet_PlayerDisconnected() { PlayerId = player.id });
 				Plugin.TriggerPlayerLeft(player);
 				connectedPlayers.Remove(connection.RemoteEndPoint);
+				playerOpenPanels.Remove(connection.RemoteEndPoint);
 				UpdatePlayerAuthorities();
 			}
         }

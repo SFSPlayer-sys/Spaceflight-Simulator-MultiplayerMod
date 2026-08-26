@@ -36,6 +36,7 @@ namespace MultiplayerSFS.Mod
         {
             SceneHelper.OnWorldSceneLoaded += (Action) delegate
             {
+                ServerUI.OnSceneChanged("world");
                 if (!ClientManager.multiplayerEnabled)
                 {
                     HostPanel.CreateUI();
@@ -48,6 +49,7 @@ namespace MultiplayerSFS.Mod
             };
             SceneHelper.OnWorldSceneUnloaded += (Action) delegate
             {
+                ServerUI.DestroyHolders();
                 HostPanel.DestroyUI();
                 if (ClientManager.multiplayerEnabled)
                 {
@@ -66,6 +68,7 @@ namespace MultiplayerSFS.Mod
             };
             SceneHelper.OnBuildSceneLoaded += (Action) delegate
             {
+                ServerUI.OnSceneChanged("build");
                 ChatWindow.CreateUI("build");
             };
             SceneHelper.OnBuildSceneUnloaded += (Action) delegate
@@ -74,6 +77,7 @@ namespace MultiplayerSFS.Mod
             };
             SceneHelper.OnHubSceneLoaded += (Action) delegate
             {
+                ServerUI.OnSceneChanged("hub");
                 ChatWindow.CreateUI("hub");
             };
             SceneHelper.OnHubSceneUnloaded += (Action) delegate
