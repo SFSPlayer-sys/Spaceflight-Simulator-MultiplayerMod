@@ -21,6 +21,7 @@ namespace MultiplayerSFS.Server
 		public static WorldState world;
 		public static Dictionary<IPEndPoint, ConnectedPlayer> connectedPlayers;
 		public static bool isRunning = false;
+		public static bool isOpenToLan = false;
 		public static byte[] planetsPackData;
 		public static string planetsPackName = "";
 		public static string planetsPackHash = "";
@@ -320,6 +321,11 @@ namespace MultiplayerSFS.Server
 		{
 			if (connection == null || FindPlayer(connection) == null)
 				return;
+			foreach (string field in new[] { "\"id\"", "\"title\"", "\"width\"", "\"height\"", "\"scene\"", "\"elements\"" })
+			{
+				if (!panelJson.Contains(field, StringComparison.Ordinal))
+					throw new ArgumentException($"Panel missing required field: {field}");
+			}
 			string panelId = ExtractPanelId(panelJson);
 			if (!playerOpenPanels.TryGetValue(connection.RemoteEndPoint, out List<string> ids))
 			{
@@ -1436,7 +1442,7 @@ namespace MultiplayerSFS.Server
 		}
 
 		/// <summary>
-		/// 只读检查是否被封禁（不过期清理）
+		/// 只读检查是否被封禁
 		/// </summary>
 		public static bool IsBannedQuick(string username, IPEndPoint endpoint)
 		{
@@ -1462,7 +1468,7 @@ namespace MultiplayerSFS.Server
 				durationSeconds = durationHours > 0 ? durationHours * 3600 : 0,
 			});
 			Save();
-			// 踢出所有匹配的在线玩家（同名或同 IP）
+			// 踢出所有匹配的在线玩家
 			foreach (var kvp in Server.connectedPlayers.ToList())
 			{
 				bool match = isIP

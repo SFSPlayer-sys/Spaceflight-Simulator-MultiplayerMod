@@ -64,6 +64,7 @@ namespace MultiplayerSFS.Server
                 { "admin", new AdminCommand() },
                 { "destroy", new DestroyCommand() },
                 { "cleardebris", new ClearDebrisCommand() },
+                { "plugins", new PluginsCommand() },
                 { "stats", new StatsCommand() },
                 { "broadcast", new BroadcastCommand() },
                 { "cheat", new CheatCommand() },
@@ -373,6 +374,28 @@ namespace MultiplayerSFS.Server
                 }
             }
             return $"Cleared {count} debris.";
+        }
+    }
+
+    public class PluginsCommand : Command
+    {
+        public override string Description => $@"
+        |Provides a list of all loaded plugins.
+        |{"plugins".FormatCommand()}: Returns every loaded plugin and its author.
+        ".CleanDescription();
+
+        public override string Run(string[] args, NetConnection sender)
+        {
+            if (args.Length > 0)
+            {
+                return "Too many arguments provided.";
+            }
+            IReadOnlyList<IPlugin> plugins = PluginManager.Plugins;
+            if (plugins.Count == 0)
+            {
+                return "Loaded plugins:\n  (none)";
+            }
+            return "Loaded plugins:\n  " + string.Join("\n  ", plugins.Select(p => $"{p.Name}(v{p.Version})"));
         }
     }
 

@@ -73,11 +73,235 @@ This mod is based on the repository MultiplayerSFS (GitHub - AstroTheRabbit/Mult
 
 # How to make a plugin?
 
-## There isn’t much to say here, but you can refer to the ExamplePlugin in the repository for guidance.
+## 1. Overview
+You can create plugins to extend the server's functionality.
 
-## Note1: 
-If you need to send UI to the client, the icons can be filled with the following values:
+[Example](ExamplePlugin.cs)
 
-```Text
-newRocket, save, load, exit, resume, exit_Resume, settings, moveRocket, clear, videoTutorials, exampleRockets, shareRocket, cheats, revert, recover, destroy, collectRock, removeFlag.
+## 2. Plugin Structure
+Every plugin must implement the IPlugin interface. Below is an example:
+```csharp
+    using System;
+    using Lidgren.Network;
+    using MultiplayerSFS.Server;
+
+    namespace MultiplayerSFS.Plugins
+    {
+        public class MyPlugin : IPlugin
+        {
+            // Required properties
+            public string ID => "myplugin";          // Unique identifier; different IDs are treated as different plugins
+            public string Name => "My Plugin";       // Display name
+            public string Author => "Your Name";     // Author
+            public string Version => "1.0.0";        // Plugin version
+            public string MinimumServerVersion => "0.4.2"; // Minimum server version required
+
+            // Lifecycle methods
+            public void OnLoad()
+            {
+                // Called when the plugin loads
+            }
+
+            public void OnUnload()
+            {
+                // Called when the plugin unloads
+            }
+
+            public void OnTick()
+            {
+                // Called once per server main loop tick
+            }
+        }
+    }
+```
+## 3. Event Subscriptions
+You can subscribe to server lifecycle events through static events on the Plugin class.
+
+### Available events:
+- Plugin.OnPlayerJoined – Triggered when a player successfully connects and is ready
+- Plugin.OnPlayerLeft – Triggered when a player disconnects
+- Plugin.OnChatMessage – Triggered when a player sends a chat message
+- Plugin.OnPanelReply – Triggered when a player replies from a custom UI panel
+- Plugin.OnPacketReceived – Triggered when any packet arrives
+
+```csharp
+Subscription example (inside OnLoad):
+
+    Plugin.OnPlayerJoined += player =>
+    {
+        Logger.Info($"{player.username} joined!");
+    };
+
+    Plugin.OnPlayerLeft += player =>
+    {
+        Logger.Info($"{player.username} left.");
+    };
+
+    Plugin.OnChatMessage += (sender, message) =>
+    {
+        if (message.Contains("badword"))
+            return null; // Block the message
+        return message;  // Forward unchanged
+    };
+
+    Plugin.OnPanelReply += (conn, panelId, action, value) =>
+    {
+        if (panelId == "my_panel" && action == "submit")
+        {
+            Logger.Info($"Player replied: {value}");
+            return true; // Handled; skip further processing
+        }
+        return false;
+    };
+```
+## 4. Custom Commands
+### Command class definition:
+Commands must inherit from the Command class and implement Description and Run methods.
+```csharp
+    class MyCommand : Command
+    {
+        public override string Description => "Performs an action";
+        public override string Run(string[] args, NetConnection sender)
+        {
+            ConnectedPlayer player = Server.FindPlayer(sender);
+            if (player == null) return "Player not found";
+            return "Command executed";
+        }
+    }
+```
+### Registering a command (in OnLoad):
+
+    CommandManager.RegisterCommand("mycmd", new MyCommand());
+
+Players can then type `/mycmd arg1 arg2` in chat to trigger it.
+
+### Permission check helper:
+```csharp
+    private bool IsAdmin(NetConnection conn)
+    {
+        ConnectedPlayer p = Server.FindPlayer(conn);
+        return p != null && p.isAdmin;
+    }
+```
+## 5. Sending Custom GUI
+The server sends GUI panels via chat messages. The format is:
+```csharp
+    //#UI_START#
+    //{UI content JSON}
+    //#UI_END#
+```
+The markers `//#UI_START#` and `//#UI_END#` are required.
+
+### Example JSON (the part between the markers):
+```csharp
+    {
+      "id": "Example",
+      "title": "Example",
+      "width": 460,
+      "height": 560,
+      "closable": true,
+      "scrollable": true,
+      "elements": [
+        { "type": "label", "text": "Label Text", "width": 400, "height": 30, "font_size": 24, "color": "#00FF00" },
+        { "type": "button", "text": "Button", "width": 400, "height": 40, "action": "demo_button" },
+        { "type": "text_input", "placeholder": "Text Input", "width": 400, "height": 40, "action": "demo_input" },
+        { "type": "container", "layout": "horizontal", "spacing": 10, "padding": 5, "elements": [
+            { "type": "button", "text": "Left", "width": 190, "height": 40, "action": "left" },
+            { "type": "button", "text": "Right", "width": 190, "height": 40, "action": "right" }
+        ]},
+        { "type": "scroll_view", "width": 420, "height": 120, "elements": [
+            { "type": "label", "text": "Scroll Row 1", "width": 380, "height": 24 }
+        ]},
+        { "type": "window", "title": "Nested Window", "width": 420, "height": 140, "closable": true, "elements": [
+            { "type": "label", "text": "Nested Content", "width": 380, "height": 24 },
+            { "type": "button", "text": "Nested Button", "width": 380, "height": 36, "action": "nested_btn" }
+        ]},
+        { "type": "separator" },
+        { "type": "spacer", "width": 10, "height": 20 }
+      ]
+    }
+```
+
+When sending, place the JSON between the markers, e.g.:
+```csharp
+    string panelJson = "{\"id\":\"Example\",...}";
+    Server.SendPanel(conn, panelJson);
+```
+Or send it as a chat message with the markers.
+
+Closing a panel:
+```csharp
+    Server.ClosePanel(conn, "Example");
+```
+Listening for panel replies: Subscribe to Plugin.OnPanelReply in OnLoad and distinguish responses by panelId and action.
+
+## 6. Player and Network Operations
+### Getting player objects:
+- Server.FindPlayer(NetConnection conn) – Get player by connection
+- Server.FindPlayerByName(string username) – Find by username
+- Server.FindConnectionByName(string username) – Get connection by username
+
+Sending packets:
+Unicast:
+```csharp
+    Server.SendPacketToPlayer(conn, new Packet_SendChatMessage() { Message = "Hello!", Color = Color.White });
+```
+Broadcast:
+```csharp
+    Server.SendPacketToAll(new Packet_SendChatMessage() { Message = "Global announcement" }, exceptConnection: null);
+```
+Kicking a player:
+```csharp
+    Server.KickPlayer(conn, "Reason text");
+```
+Ban management:
+```csharp
+    // Ban username (permanent)
+    BanManager.BanTarget("username", 0);
+    // Ban IP (24 hours)
+    BanManager.BanTarget("192.168.1.100", 24);
+    // Unban
+    BanManager.UnbanTarget("username");
+    // List bans
+    string bans = BanManager.ListBans();
+```
+## 7. Accessing World State
+The server world state is stored in Server.world:
+
+```csharp
+    // Get all rockets
+    foreach (var kvp in Server.world.rockets)
+    {
+        int rocketId = kvp.Key;
+        RocketState rocket = kvp.Value;
+        // Access rocket properties: location, velocity, parts, stages, etc.
+    }
+
+    // Get current world time (in-game time)
+    double worldTime = Server.world.WorldTime;
+
+    // Read/write cheat flags
+    Server.world.infiniteFuel = true;
+    Server.world.noGravity = false;
+```
+## 8. Logging Output
+```csharp
+    Logger.Info("Info message");       // Console + log file
+    Logger.Warning("Warning message"); // Yellow
+    Logger.Error("Error message");     // Red
+```
+## 9. Packet Interception
+To intercept or modify specific packets, implement:
+
+```csharp
+    Plugin.OnPacketReceived += (conn, packetType, msg) =>
+    {
+        if (packetType == PacketType.SendChatMessage)
+        {
+            Packet_SendChatMessage pkt = msg.Read<Packet_SendChatMessage>();
+            if (pkt.Message.Contains("spam"))
+                return true; // Skip default handling
+        }
+        return false; // Do not skip default handling
+    };
 ```

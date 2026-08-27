@@ -24,7 +24,6 @@ using Type = SFS.UI.ModGUI.Type;
 //     { "type": "label", "text": "Label Text", "width": 400, "height": 30, "font_size": 24, "color": "#00FF00" },
 //     { "type": "button", "text": "Button", "width": 400, "height": 40, "action": "demo_button" },
 //     { "type": "text_input", "placeholder": "Text Input", "width": 400, "height": 40, "action": "demo_input" },
-//     { "type": "icon_button", "icon": "trash", "action": "demo_icon" },
 //     { "type": "container", "layout": "horizontal", "spacing": 10, "padding": 5, "elements": [
 //         { "type": "button", "text": "Left", "width": 190, "height": 40, "action": "left" },
 //         { "type": "button", "text": "Right", "width": 190, "height": 40, "action": "right" }
@@ -107,8 +106,6 @@ namespace MultiplayerSFS.Mod
             {
                 JObject data = JObject.Parse(json);
                 string id = (string)data["id"];
-                if (string.IsNullOrEmpty(id))
-                    id = "server_panel";
 
                 if ((bool?)data["close"] == true)
                 {
@@ -181,9 +178,6 @@ namespace MultiplayerSFS.Mod
                     break;
                 case "button":
                     CreateButton(parent, panelId, el);
-                    break;
-                case "icon_button":
-                    Debug.LogWarning("ServerUI: icon_button 仅支持菜单场景，面板中跳过");
                     break;
                 case "text_input":
                     CreateTextInput(parent, panelId, el);

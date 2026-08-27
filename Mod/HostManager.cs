@@ -45,6 +45,7 @@ namespace MultiplayerSFS.Mod
         {
             try
             {
+                HostServer.isOpenToLan = true;
                 HostServer.Initialize(hostSettings);
                 return true;
             }

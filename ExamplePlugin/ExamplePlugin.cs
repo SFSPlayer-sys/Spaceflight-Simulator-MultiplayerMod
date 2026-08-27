@@ -35,7 +35,7 @@ namespace MultiplayerSFS.Plugins
             Plugin.OnPlayerLeft += player => joinTimes.Remove(player);
             Plugin.OnPanelReply += (conn, panelId, action, value) =>
             {
-                if (panelId != "upload_panel" || action != "upload")
+                if (action != "upload" || panelId != "upload_panel")
                     return false;
                 ConnectedPlayer p = ServerClass.FindPlayer(conn);
                 Logger.Info($"{p?.username ?? "?"}: {value}");
@@ -68,7 +68,7 @@ namespace MultiplayerSFS.Plugins
                 foreach (ConnectedPlayer player in ServerClass.connectedPlayers.Values)
                 {
                     TimeSpan online = DateTime.Now - joinTimes[player];
-                    r += $"\n{player.username}-{online.Hours}h{online.Minutes}m{online.Seconds}s";
+                    r += $"\n{player.username} - {online.Hours}h{online.Minutes}m{online.Seconds}s";
                 }
                 return r;
             }

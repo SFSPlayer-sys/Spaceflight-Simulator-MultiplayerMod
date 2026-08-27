@@ -48,8 +48,10 @@ namespace MultiplayerSFS.Mod
                 500,
                 700,
                 draggable: true,
+                savePosition: false,
                 titleText: "Open to LAN"
             );
+            window.RegisterPermanentSaving("multiplayersfs.open-to-lan");
             window.CreateLayoutGroup(Type.Vertical, padding: new RectOffset(5, 5, 5, 5));
 
             Container settings = Builder.CreateContainer(window);

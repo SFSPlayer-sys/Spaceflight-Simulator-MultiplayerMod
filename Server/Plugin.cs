@@ -1,4 +1,6 @@
 using System;
+using System.Text.RegularExpressions;
+using System.Collections.Generic;
 using Lidgren.Network;
 #if NET48
 using MultiplayerSFS.Common;
@@ -20,6 +22,119 @@ namespace MultiplayerSFS.Server
         public static event Func<NetConnection, PacketType, NetIncomingMessage, bool> OnPacketReceived;
         public static event Action<NetConnection, Packet> OnPacketSent;
         public static event Action<PacketType, NetConnection> OnUnhandledPacket;
+        public static string AskUser(string q)
+        {
+            if (Server.isOpenToLan)
+                return null;
+            Console.Write(q);
+            return Console.ReadLine();
+        }
+
+        // 设置火箭全部状态并广播更新
+        public static void SetRocketState(int rocketId, RocketState state)
+        {
+            if (!Server.world.rockets.TryGetValue(rocketId, out RocketState target))
+                return;
+            double wt = Server.world.WorldTime;
+            target.rocketName = state.rocketName;
+            target.location = state.location;
+            target.rotation = state.rotation;
+            target.angularVelocity = state.angularVelocity;
+            target.throttleOn = state.throttleOn;
+            target.throttlePercent = state.throttlePercent;
+            target.RCS = state.RCS;
+            target.input_Turn = state.input_Turn;
+            target.input_Raw = state.input_Raw;
+            target.input_Horizontal = state.input_Horizontal;
+            target.input_Vertical = state.input_Vertical;
+            target.parts = state.parts;
+            target.joints = state.joints;
+            target.stages = state.stages;
+            Server.SendPacketToAll(new Packet_UpdateRocketPrimary()
+            {
+                RocketId = rocketId,
+                WorldTime = wt,
+                Location = state.location,
+                Rotation = state.rotation,
+                AngularVelocity = state.angularVelocity,
+            });
+            Server.SendPacketToAll(new Packet_UpdateRocketSecondary()
+            {
+                RocketId = rocketId,
+                WorldTime = wt,
+                ThrottlePercent = state.throttlePercent,
+                ThrottleOn = state.throttleOn,
+                RCS = state.RCS,
+                Input_Turn = state.input_Turn,
+                Input_Raw = state.input_Raw,
+                Input_Horizontal = state.input_Horizontal,
+                Input_Vertical = state.input_Vertical,
+            });
+            Server.SendPacketToAll(new Packet_UpdateStaging()
+            {
+                RocketId = rocketId,
+                WorldTime = wt,
+                Stages = state.stages,
+            });
+            foreach (KeyValuePair<int, PartState> kvp in state.parts)
+            {
+                var part = kvp.Value.part;
+                if (part == null)
+                    continue;
+                if (part.TOGGLE_VARIABLES.TryGetValue("engine_on", out bool engineOn))
+                {
+                    Server.SendPacketToAll(new Packet_UpdatePart_EngineModule()
+                    {
+                        RocketId = rocketId,
+                        PartId = kvp.Key,
+                        WorldTime = wt,
+                        EngineOn = engineOn,
+                    });
+                }
+                if (part.TOGGLE_VARIABLES.TryGetValue("wheel_on", out bool wheelOn))
+                {
+                    Server.SendPacketToAll(new Packet_UpdatePart_WheelModule()
+                    {
+                        RocketId = rocketId,
+                        PartId = kvp.Key,
+                        WorldTime = wt,
+                        WheelOn = wheelOn,
+                    });
+                }
+                if (part.NUMBER_VARIABLES.TryGetValue("animation_state", out double animState) && part.NUMBER_VARIABLES.TryGetValue("deploy_state", out double deployState))
+                {
+                    Server.SendPacketToAll(new Packet_UpdatePart_ParachuteModule()
+                    {
+                        RocketId = rocketId,
+                        PartId = kvp.Key,
+                        WorldTime = wt,
+                        State = (float)animState,
+                        TargetState = (float)deployState,
+                    });
+                }
+                if (part.NUMBER_VARIABLES.TryGetValue("state", out double moveTime) && part.NUMBER_VARIABLES.TryGetValue("state_target", out double moveTarget))
+                {
+                    Server.SendPacketToAll(new Packet_UpdatePart_MoveModule()
+                    {
+                        RocketId = rocketId,
+                        PartId = kvp.Key,
+                        WorldTime = wt,
+                        Time = (float)moveTime,
+                        TargetTime = (float)moveTarget,
+                    });
+                }
+                if (part.NUMBER_VARIABLES.TryGetValue("fuel_percent", out double fuel))
+                {
+                    Server.SendPacketToAll(new Packet_UpdatePart_ResourceModule()
+                    {
+                        RocketId = rocketId,
+                        WorldTime = wt,
+                        ResourcePercent = fuel,
+                        PartIds = new HashSet<int>() { kvp.Key },
+                    });
+                }
+            }
+        }
 
         internal static void TriggerEvent(string eventName, object data) => OnAnyEvent?.Invoke(eventName, data);
         internal static void TriggerPlayerJoined(ConnectedPlayer player) => OnPlayerJoined?.Invoke(player);
@@ -48,15 +163,16 @@ namespace MultiplayerSFS.Server
             string panelId = "";
             string action = "";
             string value = "";
-            foreach (string line in body.Split('\n'))
+            foreach (Match m in Regex.Matches(body, "\"(\\w+)\":\"((?:[^\"\\\\]|\\\\.)*)\""))
             {
-                string t = line.Trim();
-                if (t.StartsWith("\"panel_id\":", StringComparison.Ordinal))
-                    panelId = ExtractValue(t);
-                else if (t.StartsWith("\"action\":", StringComparison.Ordinal))
-                    action = ExtractValue(t);
-                else if (t.StartsWith("\"value\":", StringComparison.Ordinal))
-                    value = ExtractValue(t);
+                string key = m.Groups[1].Value;
+                string val = m.Groups[2].Value;
+                if (key == "panel_id")
+                    panelId = val;
+                else if (key == "action")
+                    action = val;
+                else if (key == "value")
+                    value = val;
             }
             foreach (Func<NetConnection, string, string, string, bool> handler in OnPanelReply.GetInvocationList())
             {
@@ -64,15 +180,6 @@ namespace MultiplayerSFS.Server
                     return true;
             }
             return true;
-        }
-        static string ExtractValue(string line)
-        {
-            int i = line.IndexOf(':');
-            if (i < 0) return "";
-            string v = line.Substring(i + 1).Trim();
-            return v.StartsWith("\"") && v.EndsWith("\"") && v.Length >= 2
-                ? v.Substring(1, v.Length - 2)
-                : v;
         }
         internal static bool TryHandlePacketReceived(NetConnection connection, PacketType type, NetIncomingMessage msg)
         {

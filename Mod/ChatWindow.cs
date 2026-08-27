@@ -36,6 +36,7 @@ namespace MultiplayerSFS.Mod
 
         public static Window window_messages;
         public static readonly List<ChatMessage> messages = new List<ChatMessage>();
+        static bool scrollToBottom;
         public static int LastSenderId 
         { 
             get 
@@ -77,10 +78,11 @@ namespace MultiplayerSFS.Mod
                 WindowWidth,
                 WindowHeight,
                 draggable: true,
+                savePosition: false,
                 titleText: "Multiplayer Chat"
             );
             window.CreateLayoutGroup(Type.Vertical);
-            // window.RegisterPermanentSaving($"multiplayer-sfs.chat-window.{sceneName}"); 
+            window.RegisterPermanentSaving($"multiplayer-sfs.chat-window.{sceneName}"); 
             int RemainingHeight = WindowHeight - 80;
 
             container_colorPicker = Builder.CreateContainer(window);
@@ -133,6 +135,7 @@ namespace MultiplayerSFS.Mod
             input_sendMessage.field.textComponent.font = chineseFont;
             input_sendMessage.field.textComponent.ForceMeshUpdate();
             ChangeCooldownStatus(canSendMessage);
+            scrollToBottom = true;
         }
 
         public static void DestroyUI()
@@ -257,6 +260,13 @@ namespace MultiplayerSFS.Mod
                 }
                 action?.Invoke();
             }
+            if (scrollToBottom && window_messages != null)
+            {
+                scrollToBottom = false;
+                LayoutRebuilder.ForceRebuildLayoutImmediate((RectTransform)window_messages.ChildrenHolder);
+                ScrollElement scroll = window_messages.ChildrenHolder.GetComponent<ScrollElement>();
+                scroll.PercentPosition = new Vector2(scroll.PercentPosition.x, 0f);
+            }
         }
 
         public static void DestroyCooldownTimer()
@@ -282,9 +292,10 @@ namespace MultiplayerSFS.Mod
             messages.Add(message);
             if (window_messages != null)
             {
+                // 新增前已贴底则随后自动回底
+                if (IsAtBottom())
+                    scrollToBottom = true;
                 message.CreateUI();
-
-                ScrollToBottom();
             }
             while (messages.Count > maxMessagesCount)
             {
@@ -293,19 +304,13 @@ namespace MultiplayerSFS.Mod
             }
         }
 
-        // 滚动聊天窗口到底部
-        public static void ScrollToBottom()
+        // 当前是否贴在聊天底部
+        static bool IsAtBottom()
         {
-            if (window_messages != null)
-            {
-                // 获取滚动组件
-                SFS.UI.ScrollElement scrollElement = window_messages.ChildrenHolder.GetComponent<SFS.UI.ScrollElement>();
-                if (scrollElement != null)
-                {
-                    
-                    scrollElement.PercentPosition = new Vector2(0.5f, 1f);
-                }
-            }
+            if (window_messages == null)
+                return true;
+            ScrollElement scroll = window_messages.ChildrenHolder.GetComponent<ScrollElement>();
+            return scroll.PercentPosition.y <= 0.01f;
         }
 
         public static void OnPlayerColorChange(int id, Color color)

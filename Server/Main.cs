@@ -15,19 +15,13 @@ namespace MultiplayerSFS.Server
 		/// <summary>
 		/// Stops the server's config file from being saved or loaded.
 		/// </summary>
-		private static readonly bool DEV_MODE = false;
+		//private static readonly bool DEV_MODE = false;
 		public static void Main()
 		{
 			try
 			{
 				ServerSettings settings;
-				if (DEV_MODE)
-				{
-					Logger.Info("Dev mode enabled, running with default settings...", true);
-					settings = new ServerSettings();
-					File.Delete(CONFIG_FILENAME);
-				}
-				else if (!File.Exists(CONFIG_FILENAME))
+				if (!File.Exists(CONFIG_FILENAME))
 				{
 					Logger.Info($"'{CONFIG_FILENAME}' not found, running with default settings...", true);
 					settings = new ServerSettings();
@@ -38,8 +32,8 @@ namespace MultiplayerSFS.Server
 					Logger.Info($"Loading server settings from '{CONFIG_FILENAME}'...", true);
 					settings = ServerSettings.Deserialize(File.ReadAllText(CONFIG_FILENAME));
 				}
-				Server.Initialize(settings);
 				PluginManager.LoadPlugins();
+				Server.Initialize(settings);
 				Server.Run();
 				PluginManager.UnloadPlugins();
 			}

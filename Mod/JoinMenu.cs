@@ -226,12 +226,13 @@ namespace MultiplayerSFS.Mod
                     950,
                     500,
                     0,
-                    1000,
+                    700,
                     true,
-                    true,
+                    false,
                     0.95f,
                     "Servers"
                 );
+                serverListWindow.RegisterPermanentSaving("multiplayersfs.servers-list");
                 serverListWindow.CreateLayoutGroup(Type.Vertical, TextAnchor.UpperLeft, spacing: 3f, padding: new RectOffset(5, 5, 5, 5));
                 serverListRows = Builder.CreateWindow
                 (
