@@ -2,9 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Lidgren.Network;
+using MultiplayerSFS;
 using MultiplayerSFS.Server;
 using ServerClass = MultiplayerSFS.Server.Server;
-namespace MultiplayerSFS.Plugins
+namespace ExamplePlugin
 // Example
 
 {
@@ -16,7 +17,7 @@ namespace MultiplayerSFS.Plugins
         public string Version => "1.0.0";//Version
         public string MinimumServerVersion => "0.4.2";//Minimum server version required by the plugin
         
-        static readonly Dictionary<ConnectedPlayer, DateTime> joinTimes = new Dictionary<ConnectedPlayer, DateTime>();
+        static readonly Dictionary<ConnectedPlayer, DateTime> joinTimes = new();
         
         public void OnLoad()
         {
@@ -62,7 +63,7 @@ namespace MultiplayerSFS.Plugins
         class PlayerListCommand : Command
         {
             public override string Description => "List online players and their online time";
-            public override string Run(string[] args, Lidgren.Network.NetConnection sender)
+            public override string Run(string[] args, NetConnection sender)
             {
                 string r = $"Players online:";
                 foreach (ConnectedPlayer player in ServerClass.connectedPlayers.Values)

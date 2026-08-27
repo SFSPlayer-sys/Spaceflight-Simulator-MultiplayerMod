@@ -1226,7 +1226,7 @@ namespace MultiplayerSFS.Server
 			
 			if (rejectedCount == 0)
 			{
-				// 全部同意则开始时间加速
+				// 全部同意开始时间加速
 				isTimeWarping = true;
 				currentTimeScale = requestedTimeScale;
 				currentPhysicsWarp = requestedPhysicsWarp;
@@ -1313,12 +1313,8 @@ namespace MultiplayerSFS.Server
 		public float avgTripTime;
 		public float loadRange;
 		public string solarSystemName = "";
-
 		public int controlledRocket;
 		public HashSet<int> updateAuthority;
-		/// <summary>
-		/// 是否已就绪（收到 ClientReady，可以接收世界数据）
-		/// </summary>
 		public bool ready;
 
 		static readonly System.Random colorRandom = new System.Random();
