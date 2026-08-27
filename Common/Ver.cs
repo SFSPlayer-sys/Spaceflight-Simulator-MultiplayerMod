@@ -1,6 +1,6 @@
 namespace MultiplayerSFS
 {
-    ///方便些写版本号
+    ///方便写写版本号
     public static class Ver
     {
         //模组版本
