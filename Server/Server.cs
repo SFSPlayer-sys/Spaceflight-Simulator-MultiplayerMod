@@ -171,13 +171,9 @@ namespace MultiplayerSFS.Server
 					break;
 				case NetIncomingMessageType.DebugMessage:
 				case NetIncomingMessageType.VerboseDebugMessage:
-					Logger.Info($"Lidgren Debug - \"{msg.ReadString()}\".", true);
-					break;
 				case NetIncomingMessageType.WarningMessage:
-					Logger.Warning($"Lidgren Warning - \"{msg.ReadString()}\".");
-					break;
 				case NetIncomingMessageType.ErrorMessage:
-					Logger.Error($"Lidgren Error - \"{msg.ReadString()}\".");
+					HandleLidgrenLogMessage(msg);
 					break;
 				default:
 					Logger.Warning($"Unhandled message type: {msg.MessageType} - {msg.DeliveryMethod} - {msg.LengthBytes} bytes.");
@@ -216,13 +212,9 @@ namespace MultiplayerSFS.Server
 
 					case NetIncomingMessageType.DebugMessage:
 					case NetIncomingMessageType.VerboseDebugMessage:
-						Logger.Info($"Lidgren Debug - \"{msg.ReadString()}\".", true);
-						break;
 					case NetIncomingMessageType.WarningMessage:
-						Logger.Warning($"Lidgren Warning - \"{msg.ReadString()}\".");
-						break;
 					case NetIncomingMessageType.ErrorMessage:
-						Logger.Error($"Lidgren Error - \"{msg.ReadString()}\".");
+						HandleLidgrenLogMessage(msg);
 						break;
 					default:
 						Logger.Warning($"Unhandled message type: {msg.MessageType} - {msg.DeliveryMethod} - {msg.LengthBytes} bytes.");
@@ -231,6 +223,56 @@ namespace MultiplayerSFS.Server
 				server.Recycle(msg);
 			}
 			return requiresRefresh;
+		}
+
+		static void HandleLidgrenLogMessage(NetIncomingMessage msg)
+		{
+			switch (msg.MessageType)
+			{
+				case NetIncomingMessageType.DebugMessage:
+				case NetIncomingMessageType.VerboseDebugMessage:
+					Logger.Info($"Lidgren Debug - \"{msg.ReadString()}\".", true);
+					break;
+				case NetIncomingMessageType.WarningMessage:
+					Logger.Warning($"Lidgren Warning - \"{msg.ReadString()}\".");
+					break;
+				case NetIncomingMessageType.ErrorMessage:
+					Logger.Error($"Lidgren Error - \"{msg.ReadString()}\".");
+					break;
+			}
+		}
+
+		internal static Color ParseHexColor(string str, Color defaultColor)
+		{
+			if (string.IsNullOrEmpty(str))
+				return defaultColor;
+			str = str.TrimStart('#');
+			if (str.Length != 6 && str.Length != 8)
+				return defaultColor;
+			try
+			{
+				int r = Convert.ToInt32(str.Substring(0, 2), 16);
+				int g = Convert.ToInt32(str.Substring(2, 2), 16);
+				int b = Convert.ToInt32(str.Substring(4, 2), 16);
+				int a = str.Length == 8 ? Convert.ToInt32(str.Substring(6, 2), 16) : 255;
+				return new Color(r / 255f, g / 255f, b / 255f, a / 255f);
+			}
+			catch { return defaultColor; }
+		}
+
+		internal static Packet_UpdateCheatStatus GetCheatStatusPacket()
+		{
+			return new Packet_UpdateCheatStatus()
+			{
+				InfiniteFuel = world.infiniteFuel,
+				NoAtmosphericDrag = world.noAtmosphericDrag,
+				UnbreakableParts = world.unbreakableParts,
+				NoGravity = world.noGravity,
+				NoHeatDamage = world.noHeatDamage,
+				NoBurnMarks = world.noBurnMarks,
+				InfiniteBuildArea = world.infiniteBuildArea,
+				PartClipping = world.partClipping,
+			};
 		}
 
 		public static ConnectedPlayer FindPlayer(NetConnection connection)
@@ -589,47 +631,12 @@ namespace MultiplayerSFS.Server
 			}
 
 			// 发送当前作弊状态给新玩家
-			SendPacketToPlayer
-			(
-				connection,
-				new Packet_UpdateCheatStatus()
-				{
-					InfiniteFuel = world.infiniteFuel,
-					NoAtmosphericDrag = world.noAtmosphericDrag,
-					UnbreakableParts = world.unbreakableParts,
-					NoGravity = world.noGravity,
-					NoHeatDamage = world.noHeatDamage,
-					NoBurnMarks = world.noBurnMarks,
-					InfiniteBuildArea = world.infiniteBuildArea,
-					PartClipping = world.partClipping,
-				}
-			);
+			SendPacketToPlayer(connection, GetCheatStatusPacket());
 
 			// 发送 MOTD 给新玩家
 			if (!string.IsNullOrWhiteSpace(settings.motd))
 			{
-				Color motdColor = new Color(0, 0, 1, 1);
-				if (!string.IsNullOrWhiteSpace(settings.motdColor))
-				{
-					string colorStr = settings.motdColor;
-					int r = 0, g = 0, b = 0, a = 255;
-					
-					if (colorStr.Length == 6 || colorStr.Length == 8)
-					{
-						try
-						{
-							r = Convert.ToInt32(colorStr.Substring(0, 2), 16);
-							g = Convert.ToInt32(colorStr.Substring(2, 2), 16);
-							b = Convert.ToInt32(colorStr.Substring(4, 2), 16);
-							if (colorStr.Length == 8)
-							{
-								a = Convert.ToInt32(colorStr.Substring(6, 2), 16);
-							}
-							motdColor = new Color(r / 255f, g / 255f, b / 255f, a / 255f);
-						}
-						catch {}
-					}
-				}
+				Color motdColor = ParseHexColor(settings.motdColor, new Color(0, 0, 1, 1));
 				
 				SendPacketToPlayer
 				(

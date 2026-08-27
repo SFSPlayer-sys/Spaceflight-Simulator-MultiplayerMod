@@ -170,17 +170,7 @@ namespace MultiplayerSFS.ServerCommon
         /// <summary>
         /// 计算密码的 SHA256 哈希
         /// </summary>
-        public static string GetPasswordHash(string password)
-        {
-            using (System.Security.Cryptography.SHA256 sha = System.Security.Cryptography.SHA256.Create())
-            {
-                byte[] hash = sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(password));
-                System.Text.StringBuilder sb = new System.Text.StringBuilder();
-                foreach (byte b in hash)
-                    sb.Append(b.ToString("x2"));
-                return sb.ToString();
-            }
-        }
+        public static string GetPasswordHash(string password) => PlanetsPackTool.ComputeHash(System.Text.Encoding.UTF8.GetBytes(password));
 
         public override PacketType Type => PacketType.JoinRequest;
         public override void Serialize(NetOutgoingMessage msg)

@@ -322,9 +322,16 @@ namespace MultiplayerSFS.Mod.Patches
         /// <summary>
         /// 同步移动模块
         /// </summary>
-        [HarmonyPatch(typeof(MoveModule), nameof(MoveModule.Toggle))]
-        public static class MoveModule_Toggle
+        [HarmonyPatch]
+        public static class MoveModuleUpdates
         {
+            public static IEnumerable<MethodBase> TargetMethods()
+            {
+                yield return AccessTools.Method(typeof(MoveModule), nameof(MoveModule.Toggle));
+                yield return AccessTools.Method(typeof(MoveModule), nameof(MoveModule.Activate));
+                yield return AccessTools.Method(typeof(MoveModule), nameof(MoveModule.SetTargetTime));
+            }
+
             public static void Postfix(MoveModule __instance)
             {
                 if (GameManager.main != null && ClientManager.multiplayerEnabled)

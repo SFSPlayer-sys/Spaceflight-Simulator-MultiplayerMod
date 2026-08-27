@@ -52,8 +52,7 @@ namespace MultiplayerSFS.Mod
             npc.EnableMessageType(NetIncomingMessageType.StatusChanged);
 			npc.EnableMessageType(NetIncomingMessageType.UnconnectedData);
 			npc.EnableMessageType(NetIncomingMessageType.VerboseDebugMessage);
-            // TODO: ping readout UI?
-			// npc.EnableMessageType(NetIncomingMessageType.ConnectionLatencyUpdated);
+            npc.EnableMessageType(NetIncomingMessageType.ConnectionLatencyUpdated);
             client = new NetClient(npc);
             client.Start();
             NetOutgoingMessage hail = client.CreateMessage();
@@ -147,17 +146,11 @@ namespace MultiplayerSFS.Mod
                 switch (msg.MessageType)
                 {
                     case NetIncomingMessageType.Error:
-                        Debug.LogError("Lidgren Error: Corrupted packet!");
-                        break;
                     case NetIncomingMessageType.ErrorMessage:
-                        Debug.LogError($"Lidgren Error: \"{msg.ReadString()}\".");
-                        break;
                     case NetIncomingMessageType.WarningMessage:
-                        Debug.LogWarning($"Lidgren Warning: \"{msg.ReadString()}\".");
-                        break;
                     case NetIncomingMessageType.DebugMessage:
                     case NetIncomingMessageType.VerboseDebugMessage:
-                        Debug.Log($"Lidgren Debug: \"{msg.ReadString()}\".");
+                        HandleLidgrenLogMessage(msg);
                         break;
                     case NetIncomingMessageType.StatusChanged:
                         NetConnectionStatus status = (NetConnectionStatus) msg.ReadByte();
@@ -402,8 +395,7 @@ namespace MultiplayerSFS.Mod
                 difficulty = response.Difficulty,
                 solarSystemName = response.SolarSystemName,
             };
-
-            // 比对服务器星球包，匹配则直接进入世界
+            world.timeWarpScale = 0;
             if (string.IsNullOrEmpty(response.PlanetsPackHash) || localPlanetsPackHashes.Contains(response.PlanetsPackHash))
             {
                 SendPacket(new Packet_ClientReady());
@@ -411,7 +403,6 @@ namespace MultiplayerSFS.Mod
             }
             else
             {
-                // 服务器星球包与本地不匹配，下载星球包
                 Menu.loading.Open($"Downloading planets pack '{response.PlanetsPackName}'...");
                 planetsPackDownload = new PlanetsPackDownload() { packName = response.PlanetsPackName, expectedHash = response.PlanetsPackHash };
                 SendPacket(new Packet_PlanetsPackRequest() { PackName = response.PlanetsPackName });
@@ -461,17 +452,11 @@ namespace MultiplayerSFS.Mod
                 switch (msg.MessageType)
                 {
                     case NetIncomingMessageType.Error:
-                        Debug.LogError("Lidgren Error: Corrupted packet!");
-                        break;
                     case NetIncomingMessageType.ErrorMessage:
-                        Debug.LogError($"Lidgren Error: \"{msg.ReadString()}\".");
-                        break;
                     case NetIncomingMessageType.WarningMessage:
-                        Debug.LogWarning($"Lidgren Warning: \"{msg.ReadString()}\".");
-                        break;
                     case NetIncomingMessageType.DebugMessage:
                     case NetIncomingMessageType.VerboseDebugMessage:
-                        Debug.Log($"Lidgren Debug: \"{msg.ReadString()}\".");
+                        HandleLidgrenLogMessage(msg);
                         break;
                     case NetIncomingMessageType.Data:
                         HandlePacket(msg);
@@ -494,6 +479,26 @@ namespace MultiplayerSFS.Mod
                         break;
                 }
                 client.Recycle(msg);
+            }
+        }
+
+        static void HandleLidgrenLogMessage(NetIncomingMessage msg)
+        {
+            switch (msg.MessageType)
+            {
+                case NetIncomingMessageType.Error:
+                    Debug.LogError("Lidgren Error: Corrupted packet!");
+                    break;
+                case NetIncomingMessageType.ErrorMessage:
+                    Debug.LogError($"Lidgren Error: \"{msg.ReadString()}\".");
+                    break;
+                case NetIncomingMessageType.WarningMessage:
+                    Debug.LogWarning($"Lidgren Warning: \"{msg.ReadString()}\".");
+                    break;
+                case NetIncomingMessageType.DebugMessage:
+                case NetIncomingMessageType.VerboseDebugMessage:
+                    Debug.Log($"Lidgren Debug: \"{msg.ReadString()}\".");
+                    break;
             }
         }
 
@@ -740,7 +745,9 @@ namespace MultiplayerSFS.Mod
             Packet_UpdateWorldTime packet = msg.Read<Packet_UpdateWorldTime>();
             if (WorldTime.main != null)
             {
-                world.WorldTime = Math.Max(world.WorldTime, packet.WorldTime);
+                // 直接使用服务器时间（服务器已补偿延迟），不要只增不减——
+                // 否则后加入的客户端时钟永远领先，导致先加入者看后加入者的火箭出现巨大插值延迟。
+                world.WorldTime = packet.WorldTime;
                 WorldTime.main.worldTime = world.WorldTime;
             }
         }

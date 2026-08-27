@@ -46,10 +46,16 @@ namespace MultiplayerSFS.Mod
 
                 if (packet is Packet_UpdateRocketPrimary updatePacket)
                 {
-                    if (interpolator.updateBuffer.Count < MaxBuffer)
+                    if (interpolator.updateBuffer.Count >= MaxBuffer)
                     {
-                        interpolator.updateBuffer.Add(updatePacket);
+                        //移除过期包
+                        interpolator.updateBuffer.RemoveAll(p => p.WorldTime <= DelayedWorldTime);
+                        if (interpolator.updateBuffer.Count >= MaxBuffer)
+                        {
+                            interpolator.updateBuffer.RemoveAt(0);
+                        }
                     }
+                    interpolator.updateBuffer.Add(updatePacket);
                 }
                 else
                 {
@@ -87,13 +93,18 @@ namespace MultiplayerSFS.Mod
                 }
                 return;
             }
+
             if (updateBuffer.Count < MinBufferForInterpolation)
             {
-                PredictState(currentUpdate);
                 if (updateBuffer.Count > 0)
                 {
+                    InterpolatePackets(currentUpdate, updateBuffer[updateBuffer.Count - 1]);
                     currentUpdate = updateBuffer[updateBuffer.Count - 1];
                     updateBuffer.Clear();
+                }
+                else
+                {
+                    PredictState(currentUpdate);
                 }
             }
             else
@@ -105,11 +116,13 @@ namespace MultiplayerSFS.Mod
 
                     if (DelayedWorldTime > next.WorldTime)
                     {
+                        // * The current packet is now "out of date".
                         currentUpdate = updateBuffer[0];
                         updateBuffer.RemoveAt(0);
                         continue;
                     }
-
+                    
+                    // * The current packet is now "up to date" and the location of the rocket can be set via interpolation.
                     InterpolatePackets(prev, next);
                     break;
                 }
@@ -137,7 +150,7 @@ namespace MultiplayerSFS.Mod
 
         void PredictState(Packet_UpdateRocketPrimary lastPacket)
         {
-            double dt = System.Math.Min(DelayedWorldTime - lastPacket.WorldTime, 2 * LocalManager.updateRocketsPeriod / 1000.0);
+            double dt = DelayedWorldTime - lastPacket.WorldTime;
             if (dt <= 0) return;
 
             Location loc = lastPacket.Location.ToVanillaLocation();

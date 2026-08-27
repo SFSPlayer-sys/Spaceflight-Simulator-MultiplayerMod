@@ -534,23 +534,7 @@ namespace MultiplayerSFS.Server
             }
 
             // Parse color
-            Color broadcastColor = new Color(1, 1, 1, 1);
-            if (!string.IsNullOrEmpty(color) && color.StartsWith("#") && (color.Length == 7 || color.Length == 9))
-            {
-                try
-                {
-                    int r = Convert.ToInt32(color.Substring(1, 2), 16);
-                    int g = Convert.ToInt32(color.Substring(3, 2), 16);
-                    int b = Convert.ToInt32(color.Substring(5, 2), 16);
-                    int a = 255;
-                    if (color.Length == 9)
-                    {
-                        a = Convert.ToInt32(color.Substring(7, 2), 16);
-                    }
-                    broadcastColor = new Color(r / 255f, g / 255f, b / 255f, a / 255f);
-                }
-                catch {}
-            }
+            Color broadcastColor = Server.ParseHexColor(color, new Color(1, 1, 1, 1));
 
             // Send the message
             if (player.Equals("all", StringComparison.OrdinalIgnoreCase))
@@ -678,17 +662,7 @@ namespace MultiplayerSFS.Server
                     return $"Unknown cheat: {cheatName}";
             }
             //发送作弊状态更新给所有玩家
-            Server.SendPacketToAll(new Packet_UpdateCheatStatus()
-            {
-                InfiniteFuel = Server.world.infiniteFuel,
-                NoAtmosphericDrag = Server.world.noAtmosphericDrag,
-                UnbreakableParts = Server.world.unbreakableParts,
-                NoGravity = Server.world.noGravity,
-                NoHeatDamage = Server.world.noHeatDamage,
-                NoBurnMarks = Server.world.noBurnMarks,
-                InfiniteBuildArea = Server.world.infiniteBuildArea,
-                PartClipping = Server.world.partClipping,
-            });
+            Server.SendPacketToAll(Server.GetCheatStatusPacket());
 
             return $"Set {cheatName} to {value}";
         }
