@@ -91,6 +91,10 @@ namespace MultiplayerSFS.Mod
                 {
                     isNewlyCreated = false;
                 }
+                else
+                {
+                    PredictState(currentUpdate);
+                }
                 return;
             }
 
@@ -364,7 +368,7 @@ namespace MultiplayerSFS.Mod
             if (rocket.parts.TryGetValue(packet.PartId, out Part localPart) && localPart != null)
             {
                 LocalManager.TrueDestructionReason = packet.Reason;
-                localPart.DestroyPart(packet.CreateExplosion, true, LocalManager.CustomDestructionReason);
+                localPart.DestroyPart(false, true, LocalManager.CustomDestructionReason);
             }
 
         }

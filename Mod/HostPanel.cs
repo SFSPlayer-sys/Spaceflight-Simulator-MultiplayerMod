@@ -207,6 +207,8 @@ namespace MultiplayerSFS.Mod
 
         static void SetText(SFS.UI.ModGUI.Button button, string text)
         {
+            if (button == null)
+                return;
             TextAdapter textAdapter = button.gameObject.GetComponentInChildren<TextAdapter>();
             if (textAdapter != null)
             {

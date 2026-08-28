@@ -57,7 +57,7 @@ namespace MultiplayerSFS.Mod
         /// <summary>
         /// A custom `DestructionReason` used to indicate that a part or rocket's destruction was requested by the multiplayer mod (usually as a result of a packet from the server).
         /// </summary>
-        public const DestructionReason CustomDestructionReason = (DestructionReason) 4;
+        public const DestructionReason CustomDestructionReason = (DestructionReason) 5;
         /// <summary>
         /// The true reason for a part or rocket's destruction when `RocketManager.DestroyRocket` or `Part.DestroyPart` is called in multiplayer using `LocalManager.CustomDestructionReason`.
         /// This is set before those methods are called so that their related patches in `WorldEventSyncing` can correctly pass the true reason on.
@@ -339,6 +339,7 @@ namespace MultiplayerSFS.Mod
                     }
                 }
             }
+            rocket.stats.Load(0);
 
             return new LocalRocket(rocket, parts);
         }
@@ -403,7 +404,7 @@ namespace MultiplayerSFS.Mod
                     synced.interpolator.isNewlyCreated = true;
                 }
                 
-                if (Player.controlledRocket == packet.GlobalId)
+                if (Player != null && Player.controlledRocket == packet.GlobalId)
                 {
                     PlayerController.main.player.Value = synced.rocket;
                 }
@@ -443,7 +444,7 @@ namespace MultiplayerSFS.Mod
                     synced.rocket.rb2d.angularVelocity = packet.Rocket.angularVelocity;
                 }
                 
-                if (Player.controlledRocket == packet.GlobalId)
+                if (Player != null && Player.controlledRocket == packet.GlobalId)
                 {
                     // * Complete resync was sent for this client's rocket.
                     PlayerController.main.player.Value = synced.rocket;
@@ -512,18 +513,16 @@ namespace MultiplayerSFS.Mod
         /// </summary>
         public int GetPartID(Part part)
         {
-            if (partIDs.TryGetValue(part, out int id))
+            //缓存过时时重建
+            if (part != null && partIDs.TryGetValue(part, out int id) && parts.TryGetValue(id, out Part cached) && cached == part)
                 return id;
-            if (partIDs.Count != parts.Count)
+            partIDs.Clear();
+            foreach (KeyValuePair<int, Part> kvp in parts)
             {
-                partIDs.Clear();
-                foreach (KeyValuePair<int, Part> kvp in parts)
-                {
+                if (kvp.Value != null)
                     partIDs[kvp.Value] = kvp.Key;
-                }
-                return partIDs.TryGetValue(part, out id) ? id : -1;
             }
-            return -1;
+            return part != null && partIDs.TryGetValue(part, out id) ? id : -1;
         }
     }
 

@@ -11,6 +11,7 @@ using SFS;
 using SFS.UI;
 using SFS.World;
 using SFS.Variables;
+using SFS.Parts;
 using SFS.WorldBase;
 using MultiplayerSFS.Common;
 
@@ -336,7 +337,7 @@ namespace MultiplayerSFS.Mod
         }
 
         /// <summary>
-        /// 向指定服务器发送发现请求并获取信息，无响应返回null
+        /// 向指定服务器发送发现请求并获取信息
         /// </summary>
         public static async Task<ServerInfo> GetServerInfo(IPEndPoint endpoint)
         {
@@ -473,6 +474,8 @@ namespace MultiplayerSFS.Mod
                             SceneLoader.ExitToMainMenu();
                             client.Shutdown("Disconnected by server.");
                         }
+                        break;
+                    case NetIncomingMessageType.ConnectionLatencyUpdated:
                         break;
                     default:
                         Debug.LogWarning($"Unhandled message type ({msg.MessageType})!");
@@ -790,7 +793,7 @@ namespace MultiplayerSFS.Mod
 
         static Packet_UpdateCheatStatus lastCheatStatus;
         /// <summary>
-        /// 应用作弊设置，世界场景未加载时缓存待加载后应用
+        /// 应用作弊设置
         /// </summary>
         static void ApplyCheatStatus(Packet_UpdateCheatStatus packet)
         {
@@ -853,10 +856,6 @@ namespace MultiplayerSFS.Mod
                 Interpolator.AddPacketToQueue(packet, packet.RocketId, packet.WorldTime);
                 // Debug.Log($"Update rocket!!! {} => {}");
             }
-            else
-            {
-                Debug.Log("Missing rocket from world state!!!");
-            }
         }
 
         static void OnPacket_UpdateRocketSecondary(NetIncomingMessage msg)
@@ -875,7 +874,11 @@ namespace MultiplayerSFS.Mod
             if (world.rockets.TryGetValue(packet.RocketId, out RocketState state))
             {
                 state.RemovePart(packet.PartId);
-                Interpolator.AddPacketToQueue(packet, packet.PartId, packet.WorldTime);
+                if (packet.CreateExplosion && LocalManager.syncedRockets.TryGetValue(packet.RocketId, out LocalRocket localRocket) && localRocket.parts.TryGetValue(packet.PartId, out Part localPart) && localPart != null)
+                {
+                    EffectManager.CreateExplosion(localPart.transform.TransformPoint(localPart.centerOfMass.Value), localPart.mass.Value * 2f + 0.5f);
+                }
+                Interpolator.AddPacketToQueue(packet, packet.RocketId, packet.WorldTime);
             }
         }
 

@@ -278,32 +278,31 @@ namespace MultiplayerSFS.Common
             if (!persistent.FolderExists())
                 throw new Exception("'Persistent' folder cannot be found or does not exist.");
             var jsonWrapperType = typeof(SFS.Parsers.Json.JsonWrapper);
-            var tryLoadJsonMethod = jsonWrapperType.GetMethod("TryLoadJson", 
-                new Type[] { typeof(IFile), typeof(object).MakeByRefType() });
-            if (tryLoadJsonMethod == null)
+            //这里我改了1H
+            var fromJsonMethod = jsonWrapperType.GetMethod("FromJson");
+            if (fromJsonMethod == null)
             {
-                throw new Exception("JsonWrapper.TryLoadJson method not found");
+                throw new Exception("JsonWrapper.FromJson method not found");
             }
             //加载WorldSettings
-            object settings = null;
-            var settingsArgs = new object[] { folder.ExtendToFile("WorldSettings.txt"), null };
-            var settingsMethod = tryLoadJsonMethod.MakeGenericMethod(typeof(WorldSettings));
-            bool settingsLoaded = (bool)settingsMethod.Invoke(null, settingsArgs);
-            if (!settingsLoaded)
+            FilePath worldSettingsFile = folder.ExtendToFile("WorldSettings.txt");
+            if (!worldSettingsFile.FileExists())
                 throw new Exception("'WorldSettings.txt' file cannot be found or could not be loaded.");
-            WorldSettings worldSettings = (WorldSettings)settingsArgs[1];
+            WorldSettings worldSettings = (WorldSettings)fromJsonMethod.MakeGenericMethod(typeof(WorldSettings)).Invoke(null, new object[] { worldSettingsFile.ReadText() });
+            if (worldSettings == null)
+                throw new Exception("'WorldSettings.txt' file cannot be found or could not be loaded.");
             // 读取星系名称
             solarSystemName = "";
-            var solarSystemProperty = typeof(WorldSettings).GetProperty("solarSystem");
-            if (solarSystemProperty != null)
+            var solarSystemField = typeof(WorldSettings).GetField("solarSystem");
+            if (solarSystemField != null)
             {
-                var solarSystem = solarSystemProperty.GetValue(worldSettings);
+                var solarSystem = solarSystemField.GetValue(worldSettings);
                 if (solarSystem != null)
                 {
-                    var nameProperty = solarSystem.GetType().GetProperty("name");
-                    if (nameProperty != null)
+                    var nameField = solarSystem.GetType().GetField("name");
+                    if (nameField != null)
                     {
-                        var nameValue = nameProperty.GetValue(solarSystem);
+                        var nameValue = nameField.GetValue(solarSystem);
                         if (nameValue != null)
                         {
                             solarSystemName = nameValue.ToString();
@@ -312,22 +311,20 @@ namespace MultiplayerSFS.Common
                 }
             }
             Console.WriteLine($"[INFO] Loaded solar system: '{solarSystemName}'");
-            // 加载WorldState
-            object state = null;
-            var stateArgs = new object[] { persistent.ExtendToFile("WorldState.txt"), null };
-            var stateMethod = tryLoadJsonMethod.MakeGenericMethod(typeof(WorldSave.WorldState));
-            bool stateLoaded = (bool)stateMethod.Invoke(null, stateArgs);
-            if (!stateLoaded)
+            //加载WorldState
+            FilePath worldStateFile = persistent.ExtendToFile("WorldState.txt");
+            if (!worldStateFile.FileExists())
                 throw new Exception("'WorldState.txt' file cannot be found or could not be loaded.");
-            WorldSave.WorldState worldState = (WorldSave.WorldState)stateArgs[1];
-            // 加载Rockets
-            object rocketSaves = null;
-            var rocketsArgs = new object[] { persistent.ExtendToFile("Rockets.txt"), null };
-            var rocketsMethod = tryLoadJsonMethod.MakeGenericMethod(typeof(List<RocketSave>));
-            bool rocketsLoaded = (bool)rocketsMethod.Invoke(null, rocketsArgs);
-            if (!rocketsLoaded)
+            WorldSave.WorldState worldState = (WorldSave.WorldState)fromJsonMethod.MakeGenericMethod(typeof(WorldSave.WorldState)).Invoke(null, new object[] { worldStateFile.ReadText() });
+            if (worldState == null)
+                throw new Exception("'WorldState.txt' file cannot be found or could not be loaded.");
+            //加载Rockets
+            FilePath rocketsFile = persistent.ExtendToFile("Rockets.txt");
+            if (!rocketsFile.FileExists())
                 throw new Exception("'Rockets.txt' file cannot be found or could not be loaded.");
-            List<RocketSave> rocketSavesList = (List<RocketSave>)rocketsArgs[1];
+            List<RocketSave> rocketSavesList = (List<RocketSave>)fromJsonMethod.MakeGenericMethod(typeof(List<RocketSave>)).Invoke(null, new object[] { rocketsFile.ReadText() });
+            if (rocketSavesList == null)
+                throw new Exception("'Rockets.txt' file cannot be found or could not be loaded.");
             // 设置世界状态
             initWorldTime = worldState.worldTime;
             difficulty = worldSettings.difficulty.difficulty;

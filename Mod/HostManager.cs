@@ -21,7 +21,7 @@ namespace MultiplayerSFS.Mod
             isHosting = true;
             hostJoinInfo = joinInfo;
             hostSettings = settings;
-            hostSettings.worldSavePath = Base.worldBase.paths?.path.ToString();
+            hostSettings.worldSavePath = Base.worldBase.paths?.path?.Path;
             SceneLoader.ExitToMainMenu();
             SceneHelper.OnHomeSceneLoaded += OnHomeLoaded;
         }

@@ -112,7 +112,7 @@ namespace MultiplayerSFS.Mod.Patches
                     int rocketId = LocalManager.GetSyncedRocketID(__instance.Rocket);
                     if (rocketId == -1)
                     {
-                        return false;
+                        return true;
                     }
                     int partId = LocalManager.GetLocalPartID(rocketId, __instance);
                     if (partId == -1)
@@ -128,28 +128,29 @@ namespace MultiplayerSFS.Mod.Patches
                     bool hasAuthority = LocalManager.updateAuthority.Contains(rocketId);
                     bool isController = localPlayer.controlledRocket.Value == rocketId;
                     
-                    if (!hasAuthority || !isController)
+                    // if (!hasAuthority || !isController)
+                    if (!isController && !hasAuthority)
                     {
                         return false;
                     }
                     
-                    if (hasAuthority)
-                    {
-                        ClientManager.world.rockets[rocketId].RemovePart(partId);
-                        ClientManager.SendPacket
-                        (
-                            new Packet_DestroyPart()
-                            {
-                                WorldTime = ClientManager.world.WorldTime,
-                                RocketId = rocketId,
-                                PartId = partId,
-                                CreateExplosion = createExplosion,
-                                Reason = reason,
-                            }
-                        );
-                        return true;
-                    }
-                    return false;
+                    // if (hasAuthority)
+                    // {
+                    ClientManager.world.rockets[rocketId].RemovePart(partId);
+                    ClientManager.SendPacket
+                    (
+                        new Packet_DestroyPart()
+                        {
+                            WorldTime = ClientManager.world.WorldTime,
+                            RocketId = rocketId,
+                            PartId = partId,
+                            CreateExplosion = createExplosion,
+                            Reason = reason,
+                        }
+                    );
+                    return true;
+                    // }
+                    // return false;
                 }
                 return true;
             }
@@ -166,11 +167,6 @@ namespace MultiplayerSFS.Mod.Patches
                     {
                         reason = LocalManager.TrueDestructionReason;
                         return true;
-                    }
-                    if (reason == DestructionReason.Intentional)
-                    {
-                        ///MsgDrawer.main.Log("Cannot destroy rocket in multiplayer mode.");
-                        return false;
                     }
                     int id = LocalManager.GetSyncedRocketID(rocket);
                     if (id < 0)
