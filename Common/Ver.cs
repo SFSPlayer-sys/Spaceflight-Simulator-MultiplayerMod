@@ -4,9 +4,9 @@ namespace MultiplayerSFS
     public static class Ver
     {
         //模组版本
-        public const string ModVersion = "0.4.4";
+        public const string ModVersion = "0.4.5";
         //服务器版本
-        public const string ServerVersion = "0.4.4";
+        public const string ServerVersion = "0.4.5";
         //协议版本
         public const int ProtocolVersion = 4;
     }
