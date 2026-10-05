@@ -729,35 +729,51 @@ namespace MultiplayerSFS.Server
 				}
 			}
 
-			foreach (int rocketId in world.rockets.Keys)
+			if (playerPositionsCache.Count == 0)
 			{
-				if (!controlledRocketsCache.Contains(rocketId))
+				//无人控制任何火箭时轮流分给在线玩家托管
+				List<ConnectedPlayer> hosts = connectedPlayers.Values.Where(p => p.ready).ToList();
+				if (hosts.Count == 0)
+					return;
+				int index = 0;
+				foreach (int rocketId in world.rockets.Keys)
 				{
-					RocketState rocket = world.rockets[rocketId];
-					Double2 rocketPos = rocket.location.position;
-					
-					ConnectedPlayer closestPlayer = null;
-					double minDistSq = double.MaxValue;
-					
-					foreach (ConnectedPlayer player in connectedPlayers.Values)
+					if (!controlledRocketsCache.Contains(rocketId))
+						hosts[index++ % hosts.Count].updateAuthority.Add(rocketId);
+				}
+			}
+			else
+			{
+				foreach (int rocketId in world.rockets.Keys)
+				{
+					if (!controlledRocketsCache.Contains(rocketId))
 					{
-						if (playerPositionsCache.TryGetValue(player.id, out Double2 playerPos))
+						RocketState rocket = world.rockets[rocketId];
+						Double2 rocketPos = rocket.location.position;
+						
+						ConnectedPlayer closestPlayer = null;
+						double minDistSq = double.MaxValue;
+						
+						foreach (ConnectedPlayer player in connectedPlayers.Values)
 						{
-							double dx = rocketPos.x - playerPos.x;
-							double dy = rocketPos.y - playerPos.y;
-							double distSq = dx * dx + dy * dy;
-							
-							if (distSq < minDistSq)
+							if (playerPositionsCache.TryGetValue(player.id, out Double2 playerPos))
 							{
-								minDistSq = distSq;
-								closestPlayer = player;
+								double dx = rocketPos.x - playerPos.x;
+								double dy = rocketPos.y - playerPos.y;
+								double distSq = dx * dx + dy * dy;
+								
+								if (distSq < minDistSq)
+								{
+									minDistSq = distSq;
+									closestPlayer = player;
+								}
 							}
 						}
-					}
-					
-					if (closestPlayer != null)
-					{
-						closestPlayer.updateAuthority.Add(rocketId);
+						
+						if (closestPlayer != null)
+						{
+							closestPlayer.updateAuthority.Add(rocketId);
+						}
 					}
 				}
 			}

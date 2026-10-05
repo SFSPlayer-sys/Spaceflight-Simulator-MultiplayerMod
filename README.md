@@ -2,8 +2,6 @@
 
 A (WIP) multiplayer mod for the game Spaceflight Simulator.
 
-
-
 ### Server Setup & Game Guide
 
 #### Hosting a Server
@@ -90,10 +88,10 @@ Every plugin must implement the IPlugin interface. Below is an example:
         public class MyPlugin : IPlugin
         {
             // Required properties
-            public string ID => "myplugin";          // Unique identifier; different IDs are treated as different plugins
-            public string Name => "My Plugin";       // Display name
-            public string Author => "Your Name";     // Author
-            public string Version => "1.0.0";        // Plugin version
+            public string ID => "myplugin";// Unique identifier; different IDs are treated as different plugins
+            public string Name => "My Plugin";// Display name
+            public string Author => "YourName";// Author
+            public string Version => "1.0.0"// Plugin version
             public string MinimumServerVersion => "0.4.2"; // Minimum server version required
 
             // Lifecycle methods
@@ -195,7 +193,7 @@ The markers `//#UI_START#` and `//#UI_END#` are required.
 ### Example JSON (the part between the markers):
 ```csharp
     {
-      "id": "Example",
+      "id": "Exampl",
       "title": "Example",
       "width": 460,
       "height": 560,
@@ -269,26 +267,20 @@ Ban management:
 The server world state is stored in Server.world:
 
 ```csharp
-    // Get all rockets
     foreach (var kvp in Server.world.rockets)
     {
         int rocketId = kvp.Key;
         RocketState rocket = kvp.Value;
-        // Access rocket properties: location, velocity, parts, stages, etc.
     }
-
-    // Get current world time (in-game time)
     double worldTime = Server.world.WorldTime;
-
-    // Read/write cheat flags
     Server.world.infiniteFuel = true;
     Server.world.noGravity = false;
 ```
 ## 8. Logging Output
 ```csharp
-    Logger.Info("Info message");       // Console + log file
-    Logger.Warning("Warning message"); // Yellow
-    Logger.Error("Error message");     // Red
+    Logger.Info("Info message");//Log
+    Logger.Warning("Warning message");//Yellow
+    Logger.Error("Error message");//Red
 ```
 ## 9. Packet Interception
 To intercept or modify specific packets, implement:
@@ -300,8 +292,8 @@ To intercept or modify specific packets, implement:
         {
             Packet_SendChatMessage pkt = msg.Read<Packet_SendChatMessage>();
             if (pkt.Message.Contains("spam"))
-                return true; // Skip default handling
+                return true; //
         }
-        return false; // Do not skip default handling
+        return false;
     };
 ```

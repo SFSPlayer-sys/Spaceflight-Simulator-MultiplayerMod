@@ -39,6 +39,7 @@ namespace MultiplayerSFS.Mod
                 return;
             joinInfo = new JoinInfo();
             joinInfo.password = "";
+            LoadSettings();
 
             holder_window = Builder.CreateHolder(Builder.SceneToAttach.CurrentScene, "Multiplayer SFS - Open to LAN");
             window = UIToolsBuilder.CreateClosableWindow
@@ -67,6 +68,7 @@ namespace MultiplayerSFS.Mod
                 {
                     serverName = input.Trim();
                     input_serverName.FieldColor = Color.white;
+                    SaveSettings();
                 }
             );
 
@@ -83,6 +85,7 @@ namespace MultiplayerSFS.Mod
                     {
                         input_port.FieldColor = Color.red;
                     }
+                    SaveSettings();
                 }
             );
 
@@ -92,6 +95,7 @@ namespace MultiplayerSFS.Mod
                 {
                     joinInfo.username = input.Trim();
                     input_username.FieldColor = Color.white;
+                    SaveSettings();
                 }
             );
 
@@ -101,6 +105,7 @@ namespace MultiplayerSFS.Mod
                 {
                     serverPassword = input;
                     input_serverPassword.FieldColor = Color.white;
+                    SaveSettings();
                 }
             );
 
@@ -110,6 +115,7 @@ namespace MultiplayerSFS.Mod
                 {
                     adminPassword = input;
                     input_adminPassword.FieldColor = Color.white;
+                    SaveSettings();
                 }
             );
 
@@ -119,6 +125,7 @@ namespace MultiplayerSFS.Mod
                 {
                     blockDuplicateNames = !blockDuplicateNames;
                     SetText(button_blockDuplicate, blockDuplicateNames.ToString());
+                    SaveSettings();
                 }
             );
 
@@ -130,6 +137,7 @@ namespace MultiplayerSFS.Mod
                     {
                         chatCooldown = result;
                         input_chatCooldown.FieldColor = Color.white;
+                        SaveSettings();
                     }
                     else
                     {
@@ -146,6 +154,7 @@ namespace MultiplayerSFS.Mod
                     {
                         updatePeriod = result;
                         input_updatePeriod.FieldColor = Color.white;
+                        SaveSettings();
                     }
                     else
                     {
@@ -162,6 +171,7 @@ namespace MultiplayerSFS.Mod
                     {
                         loadRange = result;
                         input_loadRange.FieldColor = Color.white;
+                        SaveSettings();
                     }
                     else
                     {
@@ -171,6 +181,36 @@ namespace MultiplayerSFS.Mod
             );
 
             button_start = Builder.CreateButton(window, 470, 60, text: "Start", onClick: OnStartClicked);
+            ModConfig.RestorePanelMinimized(window, "multiplayersfs.open-to-lan");
+        }
+
+        static void LoadSettings()
+        {
+            ModConfig.HostSettings data = ModConfig.Data.Host;
+            serverName = data.serverName;
+            serverPassword = data.serverPassword;
+            adminPassword = data.adminPassword;
+            blockDuplicateNames = data.blockDuplicateNames;
+            chatCooldown = data.chatCooldown;
+            updatePeriod = data.updatePeriod;
+            loadRange = data.loadRange;
+            joinInfo.username = data.username;
+            joinInfo.port = data.port;
+        }
+
+        static void SaveSettings()
+        {
+            ModConfig.HostSettings data = ModConfig.Data.Host;
+            data.serverName = serverName;
+            data.serverPassword = serverPassword;
+            data.adminPassword = adminPassword;
+            data.blockDuplicateNames = blockDuplicateNames;
+            data.chatCooldown = chatCooldown;
+            data.updatePeriod = updatePeriod;
+            data.loadRange = loadRange;
+            data.username = joinInfo.username;
+            data.port = joinInfo.port;
+            ModConfig.Save();
         }
 
         static bool TryParseDouble(string input, out double result)
@@ -220,6 +260,7 @@ namespace MultiplayerSFS.Mod
         {
             if (holder_window != null)
             {
+                ModConfig.SavePanelMinimized(window, "multiplayersfs.open-to-lan");
                 UnityEngine.Object.Destroy(holder_window);
             }
             holder_window = null;

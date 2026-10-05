@@ -16,7 +16,6 @@ namespace MultiplayerSFS.Mod
     {
         public static Main main;
         public static FolderPath buildPersistentFolder;
-        public static FolderPath historyPersistentFolder;
         public override string ModNameID => "multiplayersfs";
         public override string DisplayName => "SFS Multiplayer";
         public override string Author => "Astro The Rabbit, VerdiX, SFSGamer";
@@ -89,7 +88,7 @@ namespace MultiplayerSFS.Mod
             AddMultiplayerButton();
 
             buildPersistentFolder = new FolderPath(ModFolder).Extend(".BlueprintPersistent");
-            historyPersistentFolder = new FolderPath(ModFolder).Extend(".HistoryPersistent");
+            ModConfig.Load();
             
             Application.quitting += () => ClientManager.client?.Shutdown("Application quitting");
             

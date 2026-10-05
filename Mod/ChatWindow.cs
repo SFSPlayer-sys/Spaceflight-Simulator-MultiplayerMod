@@ -27,6 +27,7 @@ namespace MultiplayerSFS.Mod
 
         public static GameObject holder_window;
         public static Window window;
+        static string windowKey;
 
         public static Container container_colorPicker;
         // TODO: I wanted this to be a `Slider`, but they seem quite broken so I have to use UI Tools' `NumberInput` instead.
@@ -136,12 +137,15 @@ namespace MultiplayerSFS.Mod
             input_sendMessage.field.textComponent.ForceMeshUpdate();
             ChangeCooldownStatus(canSendMessage);
             scrollToBottom = true;
+            windowKey = $"multiplayer-sfs.chat-window.{sceneName}";
+            ModConfig.RestorePanelMinimized(window, windowKey);
         }
 
         public static void DestroyUI()
         {
             if (holder_window != null)
             {
+                ModConfig.SavePanelMinimized(window, windowKey);
                 foreach (ChatMessage msg in messages)
                 {
                     msg.DestroyUI();

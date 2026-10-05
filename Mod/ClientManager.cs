@@ -61,19 +61,7 @@ namespace MultiplayerSFS.Mod
             localPlanetsPackHashes.Clear();
             try
             {
-                string recordFile = Main.main != null
-                    ? System.IO.Path.Combine(Main.main.ModFolder, ".PlanetsPackPersistent")
-                    : System.IO.Path.Combine(Application.persistentDataPath, "MultiplayerSFS_PlanetsPacks.txt");
-                Dictionary<string, string> recordedHashes = new Dictionary<string, string>();
-                if (System.IO.File.Exists(recordFile))
-                {
-                    foreach (string line in System.IO.File.ReadAllLines(recordFile))
-                    {
-                        int eq = line.IndexOf('=');
-                        if (eq > 0)
-                            recordedHashes[line.Substring(0, eq)] = line.Substring(eq + 1);
-                    }
-                }
+                Dictionary<string, string> recordedHashes = ModConfig.Data.PlanetsPackHashes;
                 string customSolarSystemsPath = System.IO.Path.Combine(Application.dataPath, "Custom Solar Systems");
                 if (System.IO.Directory.Exists(customSolarSystemsPath))
                 {
@@ -211,36 +199,19 @@ namespace MultiplayerSFS.Mod
         /// </summary>
         public static List<ServerInfo> serverHistory = new List<ServerInfo>();
 
-        /// <summary>
-        /// 历史服务器文件的保存路径
-        /// </summary>
-        static string GetHistoryFilePath()
-        {
-            return Path.Combine(Main.historyPersistentFolder.ToString(), "ServerHistory.txt");
-        }
-
         public static void LoadServerHistory()
         {
             serverHistory.Clear();
             try
             {
-                string path = GetHistoryFilePath();
-                if (!File.Exists(path))
-                    return;
-                // 每行一条：地址|端口|名字
-                foreach (string line in File.ReadAllLines(path))
+                foreach (ModConfig.ServerHistory saved in ModConfig.Data.ServerHistory)
                 {
-                    string[] parts = line.Split('|');
-                    if (parts.Length < 3)
-                        continue;
-                    if (!IPAddress.TryParse(parts[0], out IPAddress address))
-                        continue;
-                    if (!int.TryParse(parts[1], out int port))
+                    if (!IPAddress.TryParse(saved.address, out IPAddress address) || !int.TryParse(saved.port.ToString(), out int port))
                         continue;
                     serverHistory.Add(new ServerInfo()
                     {
                         endpoint = new IPEndPoint(address, port),
-                        name = parts[2],
+                        name = saved.name,
                         isHistory = true,
                     });
                 }
@@ -253,18 +224,17 @@ namespace MultiplayerSFS.Mod
 
         public static void SaveServerHistory()
         {
-            try
+            ModConfig.Data.ServerHistory.Clear();
+            foreach (ServerInfo server in serverHistory)
             {
-                List<string> lines = new List<string>();
-                foreach (ServerInfo server in serverHistory)
-                    lines.Add($"{server.endpoint.Address}|{server.endpoint.Port}|{server.name}");
-                Directory.CreateDirectory(Main.historyPersistentFolder.ToString());
-                File.WriteAllLines(GetHistoryFilePath(), lines);
+                ModConfig.Data.ServerHistory.Add(new ModConfig.ServerHistory()
+                {
+                    address = server.endpoint.Address.ToString(),
+                    port = server.endpoint.Port,
+                    name = server.name,
+                });
             }
-            catch (Exception e)
-            {
-                Debug.LogError($"Failed to save server history: {e.Message}");
-            }
+            ModConfig.Save();
         }
 
         /// <summary>
@@ -651,11 +621,8 @@ namespace MultiplayerSFS.Mod
                 string dest = System.IO.Path.Combine(Application.dataPath, "Custom Solar Systems", planetsPackDownload.packName);
                 PlanetsPackTool.Unpack(data, dest);
                 localPlanetsPackHashes.Add(planetsPackDownload.expectedHash);
-                // 记录哈希到本地，下次连接无需重新下载
-                string recordFile = Main.main != null
-                    ? System.IO.Path.Combine(Main.main.ModFolder, ".PlanetsPackPersistent")
-                    : System.IO.Path.Combine(Application.persistentDataPath, "MultiplayerSFS_PlanetsPacks.txt");
-                System.IO.File.AppendAllText(recordFile, $"{planetsPackDownload.packName}={planetsPackDownload.expectedHash}\n");
+                ModConfig.Data.PlanetsPackHashes[planetsPackDownload.packName] = planetsPackDownload.expectedHash;
+                ModConfig.Save();
                 Debug.Log($"Installed planets pack '{planetsPackDownload.packName}'.");
             }
             catch (Exception ex)

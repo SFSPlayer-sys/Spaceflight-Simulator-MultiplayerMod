@@ -165,8 +165,7 @@ namespace MultiplayerSFS.Mod.Patches
                     confirmationOpen = false;
                     foreach (int id in rockets)
                     {
-                        LocalManager.syncedRockets.Remove(id);
-                        LocalManager.updateAuthority.Remove(id);
+                        LocalManager.DestroyLocalRocket(id);
                         ClientManager.world.rockets.Remove(id);
                         ClientManager.SendPacket
                         (

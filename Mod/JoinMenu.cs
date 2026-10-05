@@ -201,7 +201,10 @@ namespace MultiplayerSFS.Mod
         static void DestroyServerList()
         {
             if (serverListHolder != null)
+            {
+                ModConfig.SavePanelMinimized(serverListWindow, "multiplayersfs.servers-list");
                 UnityEngine.Object.Destroy(serverListHolder);
+            }
             serverListHolder = null;
             serverListWindow = null;
             serverListRows = null;
@@ -253,6 +256,7 @@ namespace MultiplayerSFS.Mod
                 CreateColumnLabel(header, 80, "Password");
                 Builder.CreateLabel(header, 90, 24, text: "");
                 Builder.CreateLabel(header, 60, 24, text: "");
+                ModConfig.RestorePanelMinimized(serverListWindow, "multiplayersfs.servers-list");
             }
             while (serverListRows.ChildrenHolder.transform.childCount > 1)
                 UnityEngine.Object.DestroyImmediate(serverListRows.ChildrenHolder.transform.GetChild(1).gameObject);
